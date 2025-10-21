@@ -1,0 +1,7 @@
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - unrs-resolver
+  - '@swc/core'
+  - 'prisma'
+  - '@prisma/engines'
+  - '@prisma/client'

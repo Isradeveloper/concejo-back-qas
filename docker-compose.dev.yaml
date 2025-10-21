@@ -1,0 +1,45 @@
+services:
+  app:
+    depends_on:
+      - db
+    build:
+      context: .
+    container_name: nest-app
+    ports:
+      - ${PORT}:${PORT}
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USERNAME: ${DB_USERNAME}
+      PORT: ${PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: ${DATABASE_URL}
+      MAIL_USER: ${MAIL_USER}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      API_SIMI_URL: ${API_SIMI_URL}
+    networks:
+      - nest-app-network
+  db:
+    image: postgres:17
+    restart: always
+    container_name: postgres-db
+    ports:
+      - ${DB_PORT}:${DB_PORT}
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres-db:/var/lib/postgresql/data
+    networks:
+      - nest-app-network
+
+networks:
+  nest-app-network:
+    driver: bridge
+
+volumes:
+  postgres-db:
+    external: false

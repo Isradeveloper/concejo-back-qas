@@ -1,0 +1,233 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model DocumentType {
+  id           Int       @id @default(autoincrement())
+  name         String    @unique
+  abbreviation String    @unique
+  status       Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime? @updatedAt
+  User         User[]
+
+  @@map("document_types")
+}
+
+model Dependency {
+  id        Int      @id @default(autoincrement())
+  name      String
+  status    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User[]
+
+  @@map("dependencies")
+}
+
+model UserType {
+  id          Int       @id @default(autoincrement())
+  name        String
+  loginByCode Boolean   @default(false)
+  status      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+  User        User[]
+
+  @@map("user_types")
+}
+
+model User {
+  id             Int       @id @default(autoincrement())
+  email          String    @unique
+  password       String?
+  firstName      String
+  lastName       String?
+  documentNumber String
+  phoneNumber    String
+  status         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime? @updatedAt
+  emailVerified  Boolean   @default(false)
+  refreshToken   String?
+
+  userType          UserType            @relation(fields: [userTypeId], references: [id])
+  userTypeId        Int
+  documentType      DocumentType        @relation(fields: [documentTypeId], references: [id])
+  documentTypeId    Int
+  dependencyId      Int?
+  dependency        Dependency?         @relation(fields: [dependencyId], references: [id])
+  SimiInactiveEvent SimiInactiveEvent[]
+  VerificationCode  VerificationCode[]
+  Registration      Registration[]
+  RegistrationCite  RegistrationCite[]
+
+  @@map("users")
+}
+
+model SimiInactiveEvent {
+  id            Int    @id @default(autoincrement())
+  simiEventCode String
+  userId        Int
+  user          User   @relation(fields: [userId], references: [id])
+
+  @@map("simi_inactive_events")
+}
+
+model VerificationCode {
+  id                 Int       @id @default(autoincrement())
+  userId             Int
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code               String
+  isLogin            Boolean   @default(false)
+  isVerification     Boolean   @default(false)
+  isPasswordRecovery Boolean   @default(false)
+  expiresAt          DateTime
+  used               Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime? @updatedAt
+
+  @@map("verification_codes")
+}
+
+model ParticipationMechanism {
+  id           Int            @id @default(autoincrement())
+  name         String
+  type         String
+  subtitle     String?
+  description  String
+  icon         String
+  status       Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime?      @updatedAt
+  Registration Registration[]
+
+  @@map("participation_mechanisms")
+}
+
+model Event {
+  id                      Int            @id @default(autoincrement())
+  simiEventCode           String
+  description             String
+  date                    DateTime
+  hour                    String
+  type                    String
+  place                   String
+  topic                   String?
+  specializedProfessional String?
+  coordinator             String?
+  speakers                String[]
+  members                 Json?
+  status                  Boolean        @default(true)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime?      @updatedAt
+  Registration            Registration[]
+
+  @@map("events")
+}
+
+model Registration {
+  id                       Int                     @id @default(autoincrement())
+  userId                   Int
+  user                     User                    @relation(fields: [userId], references: [id])
+  participationMechanismId Int
+  participationMechanism   ParticipationMechanism  @relation(fields: [participationMechanismId], references: [id])
+  simiEventCode            String?
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime?               @updatedAt
+  eventId                  Int?
+  event                    Event?                  @relation(fields: [eventId], references: [id])
+  ParticipationRegister    ParticipationRegister[]
+  ProposalRegister         ProposalRegister[]
+  SubscriptionRegister     SubscriptionRegister[]
+
+  @@map("registrations")
+}
+
+model ParticipationRegister {
+  id                Int          @id @default(autoincrement())
+  registrationId    Int
+  registration      Registration @relation(fields: [registrationId], references: [id])
+  simiEventCode     String
+  ownUser           Boolean
+  organizationName  String?
+  organizationNit   String?
+  organizationEmail String?
+  organizationRole  String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime?    @updatedAt
+
+  @@map("participation_registers")
+}
+
+model ProposalStatus {
+  id               Int                @id @default(autoincrement())
+  name             String
+  status           Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime?          @updatedAt
+  ProposalRegister ProposalRegister[]
+
+  @@map("proposal_statuses")
+}
+
+model ProposalRegister {
+  id                          Int     @id @default(autoincrement())
+  simiEventCode               String?
+  politicalTopic              String?
+  politicalTopicJustification String?
+  files                       Json?
+
+  registrationId   Int
+  registration     Registration       @relation(fields: [registrationId], references: [id])
+  proposalStatusId Int
+  proposalStatus   ProposalStatus     @relation(fields: [proposalStatusId], references: [id])
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime?          @updatedAt
+  RegistrationCite RegistrationCite[]
+
+  @@map("proposal_registers")
+}
+
+model RegistrationCite {
+  id                 Int              @id @default(autoincrement())
+  proposalRegisterId Int
+  proposalRegister   ProposalRegister @relation(fields: [proposalRegisterId], references: [id])
+  userId             Int
+  user               User             @relation(fields: [userId], references: [id])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime?        @updatedAt
+  CiteQuestion       CiteQuestion[]
+
+  @@map("registration_cites")
+}
+
+model CiteQuestion {
+  id                 Int              @id @default(autoincrement())
+  registrationCiteId Int
+  registrationCite   RegistrationCite @relation(fields: [registrationCiteId], references: [id])
+  question           String
+  answer             String?
+  answeredAt         DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime?        @updatedAt
+
+  @@map("cite_questions")
+}
+
+model SubscriptionRegister {
+  id               Int          @id @default(autoincrement())
+  simiEventCode    String
+  organizationRole String?
+  registrationId   Int
+  registration     Registration @relation(fields: [registrationId], references: [id])
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime?    @updatedAt
+
+  @@map("subscription_registers")
+}
