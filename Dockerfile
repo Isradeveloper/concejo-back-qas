@@ -36,7 +36,7 @@
   COPY --from=builder /app/dist ./dist
   COPY --from=builder /app/prisma ./prisma
   COPY --from=builder /app/prisma-entrypoint.sh ./prisma-entrypoint.sh
-  COPY --from=builder /app/.env ./.env
+  # COPY --from=builder /app/.env ./.env
   
   # Asignar permisos al usuario nest
   RUN chmod +x prisma-entrypoint.sh && chown -R nest:nest /app
