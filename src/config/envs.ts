@@ -1,6 +1,6 @@
 import * as joi from 'joi';
-
-process.loadEnvFile();
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 interface EnvVars {
   PORT: number;
