@@ -1,18 +1,35 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ProposalRegister as PrismaProposalRegister,
   type ProposalStatus as PrismaProposalStatus,
+  type Registration as PrismaRegistration,
+  type User as PrismaUser,
+  type RegistrationCite as PrismaRegistrationCite,
+  type CiteQuestion as PrismaCiteQuestion,
 } from '@prisma/client';
 
 export class ProposalRegister {
   static fromPrisma(
     proposalRegister: PrismaProposalRegister & {
       proposalStatus: PrismaProposalStatus;
+      registration?: PrismaRegistration & {
+        user?: Partial<PrismaUser>;
+      };
+      RegistrationCite?: (PrismaRegistrationCite & {
+        user?: Partial<PrismaUser>;
+        CiteQuestion?: PrismaCiteQuestion[];
+      })[];
     },
   ): ProposalRegister {
     return {
       id: proposalRegister.id,
+      simiEventCode: proposalRegister.simiEventCode,
+      politicalTopic: proposalRegister.politicalTopic,
+      politicalTopicJustification: proposalRegister.politicalTopicJustification,
+      files: proposalRegister.files,
       proposalStatus: proposalRegister.proposalStatus,
+      registration: proposalRegister.registration,
+      RegistrationCite: proposalRegister.RegistrationCite,
       createdAt: proposalRegister.createdAt,
       updatedAt: proposalRegister.updatedAt || null,
     };
@@ -25,6 +42,30 @@ export class ProposalRegister {
   id: number;
 
   @ApiProperty({
+    description: 'The SIMI event code',
+    example: 'EVT001',
+  })
+  simiEventCode: string | null;
+
+  @ApiProperty({
+    description: 'The political topic of the proposal',
+    example: 'Environmental protection',
+  })
+  politicalTopic: string | null;
+
+  @ApiProperty({
+    description: 'The justification for the political topic',
+    example: 'This topic is important for the community',
+  })
+  politicalTopicJustification: string | null;
+
+  @ApiProperty({
+    description: 'Files associated with the proposal',
+    example: ['document1.pdf', 'document2.pdf'],
+  })
+  files: unknown;
+
+  @ApiProperty({
     description: 'The proposal status of the proposal register',
     example: {
       id: 1,
@@ -35,6 +76,22 @@ export class ProposalRegister {
     },
   })
   proposalStatus: PrismaProposalStatus;
+
+  @ApiPropertyOptional({
+    description: 'The registration information',
+  })
+  registration?: PrismaRegistration & {
+    user?: Partial<PrismaUser>;
+  };
+
+  @ApiPropertyOptional({
+    description: 'The registration cites',
+    isArray: true,
+  })
+  RegistrationCite?: (PrismaRegistrationCite & {
+    user?: Partial<PrismaUser>;
+    CiteQuestion?: PrismaCiteQuestion[];
+  })[];
 
   @ApiProperty({
     description: 'The created at of the proposal register',

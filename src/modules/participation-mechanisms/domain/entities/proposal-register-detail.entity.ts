@@ -1,6 +1,5 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { ProposalRegister } from './proposal-register.entity';
-import { Registration } from './registration.entity';
 import { RegistrationCite } from './registration-cite.entity';
 import {
   ProposalRegister as PrismaProposalRegister,
@@ -40,45 +39,14 @@ export class ProposalRegisterDetail extends ProposalRegister {
       simiEventCode: proposalRegister.simiEventCode,
       politicalTopic: proposalRegister.politicalTopic,
       politicalTopicJustification: proposalRegister.politicalTopicJustification,
-      registration: Registration.fromPrisma(
-        proposalRegister.registration as PrismaRegistration & {
-          user: PrismaUser & {
-            userType: PrismaUserType;
-            documentType: PrismaDocumentType;
-            dependency: PrismaDependency;
-          };
-          participationMechanism: PrismaParticipationMechanism;
-        },
-      ),
+      registration: proposalRegister.registration as PrismaRegistration & {
+        user?: Partial<PrismaUser>;
+      },
       registrationCites: proposalRegister.RegistrationCite
         ? proposalRegister.RegistrationCite.map((rc) => RegistrationCite.fromPrisma(rc))
         : [],
     };
   }
-
-  @ApiPropertyOptional({
-    description: 'The simi event code of the proposal register',
-    example: 'abc123',
-  })
-  simiEventCode?: string | null;
-
-  @ApiPropertyOptional({
-    description: 'The political topic of the proposal register',
-    example: 'Environmental protection',
-  })
-  politicalTopic?: string | null;
-
-  @ApiPropertyOptional({
-    description: 'The political topic justification of the proposal register',
-    example: 'This topic is important for our community...',
-  })
-  politicalTopicJustification?: string | null;
-
-  @ApiProperty({
-    description: 'The registration of the proposal register',
-    type: () => Registration,
-  })
-  registration: Registration;
 
   @ApiProperty({
     description: 'The registration cites associated with this proposal register',

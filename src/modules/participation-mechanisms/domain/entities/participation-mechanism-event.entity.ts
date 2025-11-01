@@ -5,7 +5,7 @@ export class ParticipationMechanismEvent {
     return {
       id: data.ID?.toString() || data.ID_PA?.toString() || data.ID_PP?.toString() || null,
       status: data.ESTADO?.toLowerCase() || null,
-      consecutive: data.CONSECUTIVO?.toString() || null,
+      consecutive: data.ID_REUNION ? `${data.ID_REUNION}-${data.CONSECUTIVO}` : data.CONSECUTIVO,
       reunionId: data.ID_REUNION?.toString() || null,
       date: data.FECHA.toString(),
       hour: data.HORA?.toString() || null,

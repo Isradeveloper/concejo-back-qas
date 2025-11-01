@@ -1,4 +1,5 @@
 export * from './accidental-commission-detail.entity';
+export * from './all-events-registered-user.entity';
 export * from './cite-question.entity';
 export * from './participation-detail.entity';
 export * from './participation-mechanism-event.entity';

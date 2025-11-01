@@ -316,4 +316,68 @@ export class RegisterRepository {
 
     if (!place) throw new BadRequestException('El lugar del evento es requerido');
   }
+
+  async answerCiteQuestion(citeQuestionId: number, answer: string, userId: number): Promise<void> {
+    const citeQuestion = await this.prisma.citeQuestion.findUnique({
+      where: { id: citeQuestionId },
+      include: {
+        registrationCite: {
+          include: {
+            user: true,
+            proposalRegister: {
+              include: {
+                proposalStatus: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!citeQuestion) {
+      throw new NotFoundException('Pregunta de cita no encontrada');
+    }
+
+    if (citeQuestion.registrationCite.userId !== userId) {
+      throw new BadRequestException('Solo puedes responder preguntas de tus propias citaciones');
+    }
+
+    if (citeQuestion.registrationCite.proposalRegister.proposalStatus.name === 'Rechazada') {
+      throw new BadRequestException('No se pueden responder preguntas de propuestas rechazadas');
+    }
+
+    await this.prisma.citeQuestion.update({
+      where: { id: citeQuestionId },
+      data: {
+        answer,
+        answeredAt: new Date(),
+      },
+    });
+  }
+
+  async changeProposalStatus(proposalRegisterId: number, proposalStatusId: number): Promise<void> {
+    const proposalRegister = await this.prisma.proposalRegister.findUnique({
+      where: { id: proposalRegisterId },
+    });
+
+    if (!proposalRegister) {
+      throw new NotFoundException('Propuesta ciudadana no encontrada');
+    }
+
+    const proposalStatus = await this.prisma.proposalStatus.findUnique({
+      where: { id: proposalStatusId },
+    });
+
+    if (!proposalStatus) {
+      throw new NotFoundException('Estado de propuesta no encontrado');
+    }
+
+    await this.prisma.proposalRegister.update({
+      where: { id: proposalRegisterId },
+      data: {
+        proposalStatusId,
+        updatedAt: new Date(),
+      },
+    });
+  }
 }

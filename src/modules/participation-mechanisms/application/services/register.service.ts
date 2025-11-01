@@ -7,6 +7,9 @@ import { ParticipationMechanismService } from './participation-mechanism.service
 import { SubscriptionRegister } from '../../domain/entities/subsciption-register.entity';
 import { CreateSubscriptionRegisterDto } from '../dto/create-subscription-register.dto';
 import { CreateProposalRegisterDto } from '../dto/create-proposal-register.dto';
+import { CreateCiteDto } from '../dto/create-cite.dto';
+import { AnswerCiteQuestionDto } from '../dto/answer-cite-question.dto';
+import { ChangeProposalStatusDto } from '../dto/change-proposal-status.dto';
 import { ProposalRegisterDetail } from '../../domain/entities';
 
 @Injectable()
@@ -53,14 +56,12 @@ export class RegisterService {
   }
 
   async createProposal(createProposalRegisterDto: CreateProposalRegisterDto): Promise<ProposalRegisterDetail> {
-    await this.validateUserAndParticipationMechanism(
-      createProposalRegisterDto.userId,
-      createProposalRegisterDto.simiEventCode || '',
-    );
+    await this.usersService.findOneById(createProposalRegisterDto.userId);
 
     if (createProposalRegisterDto.cites && createProposalRegisterDto.cites.length > 0) {
       const userIds = createProposalRegisterDto.cites.map((cite) => cite.userId);
       await this.usersService.validateCitedUsersExist(userIds);
+      await this.validateUniqueCites(createProposalRegisterDto.cites);
     }
 
     return await this.participationRegisterRepository.createProposal(createProposalRegisterDto);
@@ -106,5 +107,40 @@ export class RegisterService {
         throw new BadRequestException('Ya existe un registro con este email de organización para este evento');
       }
     }
+  }
+
+  private async validateUniqueCites(cites: CreateCiteDto[]): Promise<void> {
+    const userIds = cites.map((cite) => cite.userId);
+    const uniqueUserIds = new Set(userIds);
+
+    if (userIds.length !== uniqueUserIds.size) {
+      const duplicateUserId = userIds.find((id, index) => userIds.indexOf(id) !== index);
+
+      if (duplicateUserId !== undefined) {
+        const user = await this.usersService.findOneById(duplicateUserId);
+        if (user) {
+          const userName = `${user.firstName} ${user.lastName || ''}`.trim();
+          throw new BadRequestException(
+            `No se puede repetir un usuario en las citaciones. El usuario ${userName} - ${user.dependency?.name}) está duplicado`,
+          );
+        }
+      }
+
+      throw new BadRequestException('No se puede repetir un usuario en las citaciones');
+    }
+  }
+
+  async answerCiteQuestion(citeQuestionId: number, answerDto: AnswerCiteQuestionDto, userId: number): Promise<void> {
+    await this.participationRegisterRepository.answerCiteQuestion(citeQuestionId, answerDto.answer, userId);
+  }
+
+  async changeProposalStatus(
+    proposalRegisterId: number,
+    changeProposalStatusDto: ChangeProposalStatusDto,
+  ): Promise<void> {
+    await this.participationRegisterRepository.changeProposalStatus(
+      proposalRegisterId,
+      changeProposalStatusDto.proposalStatusId,
+    );
   }
 }

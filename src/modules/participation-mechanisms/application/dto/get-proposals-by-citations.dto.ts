@@ -1,16 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsNumber, IsPositive } from 'class-validator';
+import { IsOptional, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaginationDto } from 'src/modules/common/application/dto/pagination.dto';
 
-export class GetEventRegisteredUsersDto extends PaginationDto {
+export class GetProposalsByCitationsDto extends PaginationDto {
   @ApiPropertyOptional({
-    description: 'Participation mechanism ID to filter',
+    description: 'Estado de la propuesta',
     example: 1,
   })
   @IsOptional()
   @IsNumber()
-  @IsPositive()
   @Type(() => Number)
-  participationMechanismId?: number;
+  proposalStatusId?: number;
 }
