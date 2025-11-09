@@ -50,11 +50,12 @@ export class ParticipationMechanismsSeeder extends BaseSeeder implements ISeeder
           type: 'political-control',
         },
         {
-          name: 'Registro de temas de interés y remisión de proyectos',
-          description: '',
-          icon: 'remision',
+          name: 'Temas de interés',
+          description:
+            'Regístrate a los temas que más te interesan, vas a recibir un correo electrónico notificándote la información, cambios o novedades relacionadas con el tema de interés que seleccionaste',
+          icon: 'temas-interes',
           status: true,
-          type: 'interest-topic-and-referral',
+          type: 'interest-topic',
         },
       ];
 

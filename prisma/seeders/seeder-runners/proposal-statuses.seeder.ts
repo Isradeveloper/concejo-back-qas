@@ -20,6 +20,10 @@ export class ProposalStatusesSeeder extends BaseSeeder implements ISeeder {
           name: 'Aprobada',
           status: true,
         },
+        {
+          name: 'Rechazada',
+          status: true,
+        },
       ];
 
       await Promise.all(

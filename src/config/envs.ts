@@ -10,6 +10,9 @@ interface EnvVars {
   RESEND_API_KEY: string;
   MAIL_FROM: string;
   API_SIMI_URL: string;
+  APP_URL: string;
+  ADMIN_EMAIL: string;
+  ADMIN_PASSWORD: string;
 }
 
 const envSchema = joi
@@ -21,6 +24,9 @@ const envSchema = joi
     RESEND_API_KEY: joi.string().required(),
     MAIL_FROM: joi.string().required(),
     API_SIMI_URL: joi.string().required(),
+    APP_URL: joi.string().required(),
+    ADMIN_EMAIL: joi.string().email().required(),
+    ADMIN_PASSWORD: joi.string().required(),
   })
   .unknown(true);
 

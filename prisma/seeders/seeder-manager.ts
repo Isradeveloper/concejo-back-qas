@@ -5,6 +5,7 @@ import { UserTypesSeeder } from './seeder-runners/user-types.seeder';
 import { DependenciesSeeder } from './seeder-runners/dependencies.seeder';
 import { ParticipationMechanismsSeeder } from './seeder-runners/participation-mechanisms.seeder';
 import { ProposalStatusesSeeder } from './seeder-runners/proposal-statuses.seeder';
+import { AdminUserSeeder } from './seeder-runners/admin-user.seeder';
 
 export class SeederManager {
   private readonly prisma: PrismaClient;
@@ -36,6 +37,10 @@ export class SeederManager {
       {
         seeder: ProposalStatusesSeeder,
         config: { name: 'ProposalStatuses', priority: 5, enabled: true },
+      },
+      {
+        seeder: AdminUserSeeder,
+        config: { name: 'AdminUser', priority: 6, enabled: true },
       },
     ];
 

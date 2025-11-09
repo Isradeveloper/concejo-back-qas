@@ -53,6 +53,7 @@ model User {
   status         Boolean   @default(true)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime? @updatedAt
+  deletedAt      DateTime?
   emailVerified  Boolean   @default(false)
   refreshToken   String?
 
@@ -181,7 +182,6 @@ model ProposalRegister {
   simiEventCode               String?
   politicalTopic              String?
   politicalTopicJustification String?
-  files                       Json?
 
   registrationId   Int
   registration     Registration       @relation(fields: [registrationId], references: [id])
@@ -222,8 +222,8 @@ model CiteQuestion {
 
 model SubscriptionRegister {
   id               Int          @id @default(autoincrement())
-  simiEventCode    String
-  organizationRole String?
+  simiTopicId    String
+  topic          String
   registrationId   Int
   registration     Registration @relation(fields: [registrationId], references: [id])
   createdAt        DateTime     @default(now())
