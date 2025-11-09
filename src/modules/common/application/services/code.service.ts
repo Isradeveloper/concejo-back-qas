@@ -27,6 +27,14 @@ export class CodeService {
     return await this.verificationCodeRepository.verifyCode(userId, code);
   }
 
+  async verifyPasswordRecoveryCode(userId: number, code: string): Promise<VerificationCode> {
+    return await this.verificationCodeRepository.verifyPasswordRecoveryCode(userId, code);
+  }
+
+  async markPasswordRecoveryCodeAsUsed(userId: number, code: string): Promise<VerificationCode> {
+    return await this.verificationCodeRepository.markPasswordRecoveryCodeAsUsed(userId, code);
+  }
+
   async saveCode(userId: number, saveCode: SaveCode): Promise<VerificationCode> {
     return await this.verificationCodeRepository.saveCode(userId, saveCode);
   }

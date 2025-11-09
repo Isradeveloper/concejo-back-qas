@@ -8,6 +8,7 @@ import {
   DocumentType as PrismaDocumentType,
   ParticipationMechanism as PrismaParticipationMechanism,
   Dependency as PrismaDependency,
+  Event as PrismaEvent,
 } from '@prisma/client';
 
 export class ParticipationRegister {
@@ -20,6 +21,7 @@ export class ParticipationRegister {
           dependency: PrismaDependency | null;
         };
         participationMechanism: PrismaParticipationMechanism;
+        event?: PrismaEvent | null;
       };
     },
   ): ParticipationRegister {
@@ -33,6 +35,7 @@ export class ParticipationRegister {
             dependency: PrismaDependency | null;
           };
           participationMechanism: PrismaParticipationMechanism;
+          event?: PrismaEvent | null;
         },
       ),
       simiEventCode: participationRegister.simiEventCode,

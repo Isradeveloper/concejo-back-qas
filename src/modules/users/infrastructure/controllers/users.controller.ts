@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { UsersService } from '../../application/services/user.service';
 import { ApiTags, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { User } from '../../domain/entities/user.entity';
@@ -6,7 +6,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { CreateUserDto } from '../../application/dto/create-user.dto';
 import { UpdateUserDto } from '../../application/dto/update-user.dto';
 import { PaginationType } from 'src/modules/common/domain/interfaces/pagination.interface';
-import { PaginationDto } from 'src/modules/common/application/dto/pagination.dto';
+import { GetUsersDto } from '../../application/dto/get-users.dto';
 import { CitedUser } from '../../domain/entities/cited-user.entity';
 
 @ApiTags('users')
@@ -48,16 +48,16 @@ export class UsersController {
   @ApiBearerAuth()
   @Get()
   @ApiOkResponse({ type: User, isArray: true })
-  getAllUsers(@Query() paginationDto: PaginationDto): Promise<PaginationType<User>> {
-    return this.usersService.getAllUsers(paginationDto);
+  getAllUsers(@Query() getUsersDto: GetUsersDto): Promise<PaginationType<User>> {
+    return this.usersService.getAllUsers(getUsersDto);
   }
 
   @UseGuards(AuthGuard())
   @ApiBearerAuth()
-  @Delete(':id')
+  @Patch(':id/change-status')
   @ApiOkResponse({ type: User })
-  delete(@Param('id', ParseIntPipe) id: number): Promise<User> {
-    return this.usersService.delete(id);
+  changeStatus(@Param('id', ParseIntPipe) id: number): Promise<User> {
+    return this.usersService.changeStatus(id);
   }
 
   @Get('get-all/cited')

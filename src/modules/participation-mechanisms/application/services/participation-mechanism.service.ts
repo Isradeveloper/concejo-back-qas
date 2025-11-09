@@ -14,8 +14,12 @@ import {
   ParticipationDetailResponse,
   ParticipationMechanism,
   AllEventsRegisteredUser,
+  InterestTopic,
+  InterestTopicResponse,
+  SubscriptionRegister,
 } from '../../domain/entities';
 import { EventRegisteredUser } from '../../domain/entities/event-registered-user.entity';
+import { SubscriptionRegisteredUser } from '../../domain/entities/subscription-registered-user.entity';
 import { ProposalRegister } from '../../domain/entities/proposal-register.entity';
 import { PaginationType } from 'src/modules/common/domain/interfaces/pagination.interface';
 import { GetEventsDto } from '../dto/get-events.dto';
@@ -24,7 +28,9 @@ import { GetProposalsDto } from '../dto/get-proposals.dto';
 import { GetProposalsByCitationsDto } from '../dto/get-proposals-by-citations.dto';
 import { DeactivateEventDto } from '../dto/deactivate-event.dto';
 import { ReactivateEventDto } from '../dto/reactivate-event.dto';
-import { exportToExcelWithJson } from 'src/modules/common/infrastructure/utils/export-to-excel.utils';
+import { GetSubscriptionsDto } from '../dto/get-subscriptions.dto';
+import { GetSubscriptionRegisteredUsersDto } from '../dto/get-subscription-registered-users.dto';
+import { exportToExcelWithJson } from 'src/modules/common/infrastructure/utils/export-to-excel.util';
 
 @Injectable()
 export class ParticipationMechanismService {
@@ -92,18 +98,37 @@ export class ParticipationMechanismService {
 
     const inactiveSimiCodes = await this.participationMechanismRepository.getInactiveSimiCodes();
 
-    console.log(JSON.stringify(response.data, null, 2));
+    const filteredParticipations = response.data
+      .map((participation) => ParticipationMechanismEvent.fromResponse(participation))
+      .filter(
+        (participation) =>
+          participation.status !== 'cancelada' &&
+          (type === 'all' || participation.debate === type) &&
+          !this.isEventInactive(participation.consecutive, inactiveSimiCodes),
+      );
 
-    return getDataForTwoWeeks(
-      response.data
-        .map((participation) => ParticipationMechanismEvent.fromResponse(participation))
-        .filter(
-          (participation) =>
-            participation.status !== 'cancelada' &&
-            (type === 'all' || participation.debate === type) &&
-            !this.isEventInactive(participation.consecutive, inactiveSimiCodes),
-        ),
+    const groupedByConsecutive = filteredParticipations.reduce(
+      (acc, participation) => {
+        const key = participation.consecutive || 'unknown';
+        const existing = acc[key];
+
+        if (!existing) {
+          acc[key] = participation;
+        } else {
+          const currentId = participation.id ? Number.parseInt(participation.id, 10) : 0;
+          const existingId = existing.id ? Number.parseInt(existing.id, 10) : 0;
+
+          if (currentId > existingId) {
+            acc[key] = participation;
+          }
+        }
+
+        return acc;
+      },
+      {} as Record<string, ParticipationMechanismEvent>,
     );
+
+    return getDataForTwoWeeks(Object.values(groupedByConsecutive));
   }
 
   async getParticipationDetail(id: string): Promise<ParticipationDetail> {
@@ -129,6 +154,23 @@ export class ParticipationMechanismService {
     } catch (error) {
       Logger.error('Error al obtener el detalle de la comisión accidental', error);
       throw new BadRequestException('Error al obtener el detalle de la comisión accidental');
+    }
+  }
+
+  async getInterestTopics(): Promise<InterestTopic[]> {
+    try {
+      const response = await this.httpService.axiosRef.get<InterestTopicResponse[]>(
+        `${envVars.API_SIMI_URL}/temas?modulo=1`,
+      );
+
+      const interestTopics: InterestTopic[] = response.data.map((item: InterestTopicResponse) =>
+        InterestTopic.fromResponse(item),
+      );
+
+      return interestTopics;
+    } catch (error) {
+      Logger.error('Error al obtener los temas de interés', error);
+      throw new BadRequestException('Error al obtener los temas de interés');
     }
   }
 
@@ -230,6 +272,44 @@ export class ParticipationMechanismService {
 
   async reactivateEvent(reactivateEventDto: ReactivateEventDto): Promise<void> {
     return await this.participationMechanismRepository.reactivateEvent(reactivateEventDto.simiEventCode);
+  }
+
+  async getAllSubscriptions(getSubscriptionsDto: GetSubscriptionsDto): Promise<PaginationType<SubscriptionRegister>> {
+    return await this.participationMechanismRepository.getAllSubscriptions(getSubscriptionsDto);
+  }
+
+  async getSubscriptionRegisteredUsers(
+    simiTopicId: string,
+    getSubscriptionRegisteredUsersDto: GetSubscriptionRegisteredUsersDto,
+  ): Promise<SubscriptionRegisteredUser[]> {
+    return await this.participationMechanismRepository.getSubscriptionRegisteredUsers(
+      simiTopicId,
+      getSubscriptionRegisteredUsersDto,
+    );
+  }
+
+  async getAllSubscriptionsExcel(getSubscriptionsDto: GetSubscriptionsDto): Promise<string> {
+    const subscriptions =
+      await this.participationMechanismRepository.getAllSubscriptionsNoPagination(getSubscriptionsDto);
+
+    const plainData: Record<string, unknown>[] = subscriptions.map((subscription) => ({
+      id: subscription.id,
+      nombre: subscription.registration.user.firstName,
+      apellido: subscription.registration.user.lastName,
+      email: subscription.registration.user.email,
+      documento: subscription.registration.user.documentNumber,
+      telefono: subscription.registration.user.phoneNumber,
+      tipoUsuario: subscription.registration.user.userType.name,
+      tipoDocumento: subscription.registration.user.documentType.name,
+      dependency: subscription.registration.user.dependency?.name || '',
+      tema: subscription.topic,
+      codigoTema: subscription.simiTopicId,
+      fechaRegistro: subscription.createdAt,
+    }));
+
+    return await exportToExcelWithJson(plainData, 'America/Bogota', 'DD/MM/YYYY', {
+      worksheetName: 'Usuarios suscritos',
+    });
   }
 
   private isEventInactive(eventId: string | null | undefined, inactiveSimiCodes: string[]): boolean {

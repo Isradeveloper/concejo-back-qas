@@ -35,6 +35,29 @@ export class VerificationCodeRepository {
       .then((verificationCode) => VerificationCode.fromPrisma(verificationCode));
   }
 
+  async verifyPasswordRecoveryCode(userId: number, code: string): Promise<VerificationCode> {
+    const verificationCode = await this.prisma.verificationCode.findFirst({
+      where: { code, userId, isPasswordRecovery: true },
+    });
+    if (!verificationCode)
+      throw new NotFoundException(`No se encontró el código de recuperación de contraseña ${code}`);
+
+    if (verificationCode.used)
+      throw new BadRequestException(`El código de recuperación de contraseña ya ha sido usado`);
+    if (verificationCode.expiresAt < new Date())
+      throw new BadRequestException(`El código de recuperación de contraseña ha expirado`);
+
+    return VerificationCode.fromPrisma(verificationCode);
+  }
+
+  async markPasswordRecoveryCodeAsUsed(userId: number, code: string): Promise<VerificationCode> {
+    const verificationCode = await this.verifyPasswordRecoveryCode(userId, code);
+
+    return await this.prisma.verificationCode
+      .update({ where: { id: verificationCode.id }, data: { used: true } })
+      .then((verificationCode) => VerificationCode.fromPrisma(verificationCode));
+  }
+
   async saveCode(userId: number, saveCode: SaveCode): Promise<VerificationCode> {
     return await this.prisma.verificationCode
       .create({

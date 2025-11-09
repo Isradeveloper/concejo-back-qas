@@ -10,10 +10,11 @@ import { CodeService } from 'src/modules/common/application/services/code.servic
 import { DocumentTypeService } from './document-type.service';
 import { UserTypeService } from './user-type.service';
 import bcrypt from 'bcrypt';
-import { PaginationDto } from 'src/modules/common/application/dto/pagination.dto';
 import { PaginationType } from 'src/modules/common/domain/interfaces/pagination.interface';
 import { DependencyService } from './dependency.service';
 import { CitedUser } from '../../domain/entities/cited-user.entity';
+import { GetUsersDto } from '../dto/get-users.dto';
+import { MailTemplate } from 'src/modules/common/infrastructure/utils/mail-templates.util';
 @Injectable()
 export class UsersService {
   constructor(
@@ -27,6 +28,14 @@ export class UsersService {
 
   async validateUniqueEmail(email: string): Promise<boolean> {
     return await this.userRepository.validateUniqueEmail(email);
+  }
+
+  async validateUniqueDocumentNumber(
+    documentNumber: string,
+    documentTypeId: number,
+    excludeUserId?: number,
+  ): Promise<boolean> {
+    return await this.userRepository.validateUniqueDocumentNumber(documentNumber, documentTypeId, excludeUserId);
   }
 
   async findOneByEmail(email: string): Promise<User> {
@@ -48,6 +57,8 @@ export class UsersService {
   }): Promise<User> {
     await this.validateUniqueEmail(createCitizenUserDto.email);
 
+    await this.validateUniqueDocumentNumber(createCitizenUserDto.documentNumber, createCitizenUserDto.documentTypeId);
+
     const user = await this.userRepository.createCitizen(createCitizenUserDto, userTypeId, saveCode);
 
     return user;
@@ -57,6 +68,8 @@ export class UsersService {
     await this.validateUniqueEmail(createUserDto.email);
 
     await this.documentTypeService.findOneById(createUserDto.documentTypeId);
+
+    await this.validateUniqueDocumentNumber(createUserDto.documentNumber, createUserDto.documentTypeId);
 
     await this.userTypeService.findOneById(createUserDto.userTypeId);
 
@@ -75,7 +88,10 @@ export class UsersService {
     await this.mailerService.sendEmail({
       to: user.email,
       subject: 'Código de verificación',
-      htmlBody: `Tu código de verificación es: ${saveCode.code}`,
+      htmlBody: new MailTemplate(
+        'Código de verificación',
+        `<div style="text-align: center;"><span style="font-size: 15px;">Hola ${user.firstName} ${user.lastName} 👋, te compartimos tu código de verificación: </span> <br/> <br/> <span style="font-size: 25px; font-weight: bold;">${saveCode.code}</span></div>`,
+      ).render(),
     });
 
     return user;
@@ -88,6 +104,17 @@ export class UsersService {
     if (userData.documentTypeId) {
       await this.documentTypeService.findOneById(userData.documentTypeId);
     }
+
+    if (userData.documentNumber || userData.documentTypeId) {
+      const existingUser = await this.findOneById(id);
+      if (!existingUser) {
+        throw new Error('Usuario no encontrado');
+      }
+      const documentNumber = userData.documentNumber ?? existingUser.documentNumber;
+      const documentTypeId = userData.documentTypeId ?? existingUser.documentTypeId;
+      await this.validateUniqueDocumentNumber(documentNumber, documentTypeId, id);
+    }
+
     if (userData.userTypeId) {
       await this.userTypeService.findOneById(userData.userTypeId);
     }
@@ -99,13 +126,17 @@ export class UsersService {
     return await this.userRepository.getUserPassword(id);
   }
 
-  async getAllUsers(paginationDto: PaginationDto): Promise<PaginationType<User>> {
-    return await this.userRepository.getAllUsers(paginationDto);
+  async userHasPassword(id: number): Promise<boolean> {
+    return await this.userRepository.userHasPassword(id);
   }
 
-  async delete(id: number): Promise<User> {
-    await this.findOneById(id);
-    return await this.userRepository.delete(id);
+  async getAllUsers(getUsersDto: GetUsersDto): Promise<PaginationType<User>> {
+    return await this.userRepository.getAllUsers(getUsersDto);
+  }
+
+  async changeStatus(id: number): Promise<User> {
+    const currentUser = await this.findOneById(id);
+    return await this.userRepository.changeStatus(id, currentUser!.status);
   }
 
   async getCitedUsers(): Promise<CitedUser[]> {
@@ -114,5 +145,9 @@ export class UsersService {
 
   async validateCitedUsersExist(userIds: number[]): Promise<void> {
     return await this.userRepository.validateCitedUsersExist(userIds);
+  }
+
+  async updatePassword(id: number, hashedPassword: string): Promise<User> {
+    return await this.userRepository.updatePassword(id, hashedPassword);
   }
 }

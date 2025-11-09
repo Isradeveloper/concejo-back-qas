@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Delete, Param, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RegisterService } from '../../application/services/register.service';
 import { ParticipationRegister } from '../../domain/entities/participation-register.entity';
@@ -28,6 +28,13 @@ export class RegistersController {
     @Body() createSubscriptionRegisterDto: CreateSubscriptionRegisterDto,
   ): Promise<SubscriptionRegister> {
     return this.registerService.createSubscription(createSubscriptionRegisterDto);
+  }
+
+  @Delete('subscription/:id')
+  @ApiOkResponse({ description: 'Subscription deleted successfully' })
+  async deleteSubscription(@Param('id', ParseIntPipe) id: number): Promise<{ message: string }> {
+    await this.registerService.deleteSubscription(id);
+    return { message: 'Subscription deleted successfully' };
   }
 
   @Post('proposal')

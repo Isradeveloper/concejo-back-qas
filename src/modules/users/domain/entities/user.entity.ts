@@ -81,6 +81,12 @@ export class User {
   })
   updatedAt?: Date;
 
+  @ApiPropertyOptional({
+    description: 'Fecha de eliminación del usuario',
+    example: new Date(),
+  })
+  deletedAt?: Date;
+
   @ApiProperty({
     description: 'ID Tipo de usuario',
     example: 1,

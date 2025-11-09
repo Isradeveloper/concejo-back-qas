@@ -11,6 +11,10 @@ import { PaginationDto } from 'src/modules/common/application/dto/pagination.dto
 import { EventRegisteredUser } from '../../domain/entities/event-registered-user.entity';
 import { AllEventsRegisteredUser } from '../../domain/entities/all-events-registered-user.entity';
 import { ProposalRegister } from '../../domain/entities/proposal-register.entity';
+import { SubscriptionRegister } from '../../domain/entities/subsciption-register.entity';
+import { SubscriptionRegisteredUser } from '../../domain/entities/subscription-registered-user.entity';
+import { GetSubscriptionsDto } from '../../application/dto/get-subscriptions.dto';
+import { GetSubscriptionRegisteredUsersDto } from '../../application/dto/get-subscription-registered-users.dto';
 
 @Injectable()
 export class ParticipationMechanismRepository {
@@ -706,5 +710,287 @@ export class ParticipationMechanismRepository {
     });
 
     return inactiveEvents.map((event) => event.simiEventCode);
+  }
+
+  async getAllSubscriptions(getSubscriptionsDto: GetSubscriptionsDto): Promise<PaginationType<SubscriptionRegister>> {
+    const orderBy = getSubscriptionsDto.orderBy ?? 'createdAt';
+    const orderDirection = getSubscriptionsDto.orderDirection ?? 'desc';
+
+    const userFilters: Record<string, unknown> = {};
+    if (getSubscriptionsDto.firstName) {
+      userFilters.firstName = { contains: getSubscriptionsDto.firstName, mode: 'insensitive' as const };
+    }
+    if (getSubscriptionsDto.lastName) {
+      userFilters.lastName = { contains: getSubscriptionsDto.lastName, mode: 'insensitive' as const };
+    }
+    if (getSubscriptionsDto.email) {
+      userFilters.email = { contains: getSubscriptionsDto.email, mode: 'insensitive' as const };
+    }
+    if (getSubscriptionsDto.documentNumber) {
+      userFilters.documentNumber = { contains: getSubscriptionsDto.documentNumber, mode: 'insensitive' as const };
+    }
+
+    const registrationFilters: Record<string, unknown> = {};
+    if (getSubscriptionsDto.userId) {
+      registrationFilters.userId = getSubscriptionsDto.userId;
+    }
+    if (Object.keys(userFilters).length > 0) {
+      registrationFilters.user = userFilters;
+    }
+
+    const baseConditions: Record<string, unknown>[] = [];
+    if (getSubscriptionsDto.topic) {
+      baseConditions.push({ topic: { contains: getSubscriptionsDto.topic, mode: 'insensitive' as const } });
+    }
+    if (Object.keys(registrationFilters).length > 0) {
+      baseConditions.push({ registration: registrationFilters });
+    }
+
+    const searchConditions: Record<string, unknown>[] = [];
+    if (getSubscriptionsDto.search) {
+      searchConditions.push({ simiTopicId: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } });
+      searchConditions.push({ topic: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } });
+
+      if (Object.keys(userFilters).length === 0 && !getSubscriptionsDto.userId) {
+        searchConditions.push({
+          registration: {
+            user: {
+              OR: [
+                { firstName: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } },
+                { lastName: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } },
+                { email: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } },
+                { documentNumber: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } },
+              ],
+            },
+          },
+        });
+      }
+    }
+
+    const whereCondition: Record<string, unknown> = {};
+    if (baseConditions.length > 0 && searchConditions.length > 0) {
+      whereCondition.AND = [...baseConditions, { OR: searchConditions }];
+    } else if (baseConditions.length > 0) {
+      if (baseConditions.length === 1) {
+        Object.assign(whereCondition, baseConditions[0]);
+      } else {
+        whereCondition.AND = baseConditions;
+      }
+    } else if (searchConditions.length > 0) {
+      whereCondition.OR = searchConditions;
+    }
+
+    return this.paginationUtil.getPaginatedPrismaData<SubscriptionRegister>({
+      paginationDto: getSubscriptionsDto,
+      prismaQuery: async () => {
+        const subscriptionRegisters = await this.prisma.subscriptionRegister.findMany({
+          where: whereCondition,
+          ...this.paginationUtil.getSkipAndTake(getSubscriptionsDto),
+          orderBy: {
+            [orderBy]: orderDirection,
+          },
+          include: {
+            registration: {
+              include: {
+                user: {
+                  include: {
+                    userType: true,
+                    documentType: true,
+                    dependency: true,
+                  },
+                },
+                participationMechanism: true,
+                event: true,
+              },
+            },
+          },
+        });
+        return subscriptionRegisters.map((subscriptionRegister) =>
+          SubscriptionRegister.fromPrisma(subscriptionRegister),
+        );
+      },
+      countQuery: () =>
+        this.prisma.subscriptionRegister.count({
+          where: whereCondition,
+        }),
+    });
+  }
+
+  async getAllSubscriptionsNoPagination(getSubscriptionsDto: GetSubscriptionsDto): Promise<SubscriptionRegister[]> {
+    const orderBy = getSubscriptionsDto.orderBy ?? 'createdAt';
+    const orderDirection = getSubscriptionsDto.orderDirection ?? 'desc';
+
+    const userFilters: Record<string, unknown> = {};
+    if (getSubscriptionsDto.firstName) {
+      userFilters.firstName = { contains: getSubscriptionsDto.firstName, mode: 'insensitive' as const };
+    }
+    if (getSubscriptionsDto.lastName) {
+      userFilters.lastName = { contains: getSubscriptionsDto.lastName, mode: 'insensitive' as const };
+    }
+    if (getSubscriptionsDto.email) {
+      userFilters.email = { contains: getSubscriptionsDto.email, mode: 'insensitive' as const };
+    }
+    if (getSubscriptionsDto.documentNumber) {
+      userFilters.documentNumber = { contains: getSubscriptionsDto.documentNumber, mode: 'insensitive' as const };
+    }
+
+    const registrationFilters: Record<string, unknown> = {};
+    if (getSubscriptionsDto.userId) {
+      registrationFilters.userId = getSubscriptionsDto.userId;
+    }
+    if (Object.keys(userFilters).length > 0) {
+      registrationFilters.user = userFilters;
+    }
+
+    const baseConditions: Record<string, unknown>[] = [];
+    if (getSubscriptionsDto.topic) {
+      baseConditions.push({ topic: { contains: getSubscriptionsDto.topic, mode: 'insensitive' as const } });
+    }
+    if (Object.keys(registrationFilters).length > 0) {
+      baseConditions.push({ registration: registrationFilters });
+    }
+
+    const searchConditions: Record<string, unknown>[] = [];
+    if (getSubscriptionsDto.search) {
+      searchConditions.push({ simiTopicId: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } });
+      searchConditions.push({ topic: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } });
+
+      if (Object.keys(userFilters).length === 0 && !getSubscriptionsDto.userId) {
+        searchConditions.push({
+          registration: {
+            user: {
+              OR: [
+                { firstName: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } },
+                { lastName: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } },
+                { email: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } },
+                { documentNumber: { contains: getSubscriptionsDto.search, mode: 'insensitive' as const } },
+              ],
+            },
+          },
+        });
+      }
+    }
+
+    const whereCondition: Record<string, unknown> = {};
+    if (baseConditions.length > 0 && searchConditions.length > 0) {
+      whereCondition.AND = [...baseConditions, { OR: searchConditions }];
+    } else if (baseConditions.length > 0) {
+      if (baseConditions.length === 1) {
+        Object.assign(whereCondition, baseConditions[0]);
+      } else {
+        whereCondition.AND = baseConditions;
+      }
+    } else if (searchConditions.length > 0) {
+      whereCondition.OR = searchConditions;
+    }
+
+    const subscriptionRegisters = await this.prisma.subscriptionRegister.findMany({
+      where: whereCondition,
+      orderBy: {
+        [orderBy]: orderDirection,
+      },
+      include: {
+        registration: {
+          include: {
+            user: {
+              include: {
+                userType: true,
+                documentType: true,
+                dependency: true,
+              },
+            },
+            participationMechanism: true,
+            event: true,
+          },
+        },
+      },
+    });
+
+    return subscriptionRegisters.map((subscriptionRegister) => SubscriptionRegister.fromPrisma(subscriptionRegister));
+  }
+
+  async getSubscriptionRegisteredUsers(
+    simiTopicId: string,
+    getSubscriptionRegisteredUsersDto: GetSubscriptionRegisteredUsersDto,
+  ): Promise<SubscriptionRegisteredUser[]> {
+    const whereCondition = {
+      simiTopicId,
+      ...(getSubscriptionRegisteredUsersDto.topic && {
+        topic: { contains: getSubscriptionRegisteredUsersDto.topic, mode: 'insensitive' as const },
+      }),
+      ...(getSubscriptionRegisteredUsersDto.search && {
+        OR: [
+          {
+            registration: {
+              user: {
+                OR: [
+                  { firstName: { contains: getSubscriptionRegisteredUsersDto.search, mode: 'insensitive' as const } },
+                  { lastName: { contains: getSubscriptionRegisteredUsersDto.search, mode: 'insensitive' as const } },
+                  { email: { contains: getSubscriptionRegisteredUsersDto.search, mode: 'insensitive' as const } },
+                  {
+                    documentNumber: {
+                      contains: getSubscriptionRegisteredUsersDto.search,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          { topic: { contains: getSubscriptionRegisteredUsersDto.search, mode: 'insensitive' as const } },
+        ],
+      }),
+    };
+
+    const subscriptionRegisters = await this.prisma.subscriptionRegister.findMany({
+      where: whereCondition,
+      include: {
+        registration: {
+          include: {
+            user: {
+              include: {
+                userType: true,
+                documentType: true,
+                dependency: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (subscriptionRegisters.length === 0) {
+      const topicExists = await this.prisma.subscriptionRegister.findFirst({
+        where: { simiTopicId },
+        select: { id: true },
+      });
+
+      if (!topicExists) {
+        throw new NotFoundException(`Subscription topic not found with simiTopicId ${simiTopicId}`);
+      }
+    }
+
+    return subscriptionRegisters.map((subscriptionRegister) => {
+      const subscriptionRegisteredUser = new SubscriptionRegisteredUser();
+      Object.assign(subscriptionRegisteredUser, {
+        id: subscriptionRegister.id,
+        userId: subscriptionRegister.registration.user.id,
+        firstName: subscriptionRegister.registration.user.firstName,
+        lastName: subscriptionRegister.registration.user.lastName || null,
+        email: subscriptionRegister.registration.user.email,
+        documentNumber: subscriptionRegister.registration.user.documentNumber,
+        phoneNumber: subscriptionRegister.registration.user.phoneNumber,
+        userType: subscriptionRegister.registration.user.userType,
+        documentType: subscriptionRegister.registration.user.documentType,
+        dependency: subscriptionRegister.registration.user.dependency || null,
+        simiTopicId: subscriptionRegister.simiTopicId,
+        topic: subscriptionRegister.topic,
+        registrationDate: subscriptionRegister.createdAt,
+      });
+      return subscriptionRegisteredUser;
+    });
   }
 }

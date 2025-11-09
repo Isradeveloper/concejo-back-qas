@@ -1,6 +1,7 @@
 export * from './accidental-commission-detail.entity';
 export * from './all-events-registered-user.entity';
 export * from './cite-question.entity';
+export * from './interest-topic.entity';
 export * from './participation-detail.entity';
 export * from './participation-mechanism-event.entity';
 export * from './participation-mechanism.entity';
@@ -11,3 +12,5 @@ export * from './registration-cite.entity';
 export * from './registration.entity';
 export * from './event.entity';
 export * from './event-registered-user.entity';
+export * from './subscription-registered-user.entity';
+export * from './subsciption-register.entity';

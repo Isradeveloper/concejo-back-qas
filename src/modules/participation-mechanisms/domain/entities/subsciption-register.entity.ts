@@ -8,6 +8,7 @@ import {
   DocumentType as PrismaDocumentType,
   ParticipationMechanism as PrismaParticipationMechanism,
   Dependency as PrismaDependency,
+  Event as PrismaEvent,
 } from '@prisma/client';
 
 export class SubscriptionRegister {
@@ -20,6 +21,7 @@ export class SubscriptionRegister {
           dependency: PrismaDependency | null;
         };
         participationMechanism: PrismaParticipationMechanism;
+        event?: PrismaEvent | null;
       };
     },
   ): SubscriptionRegister {
@@ -33,10 +35,11 @@ export class SubscriptionRegister {
             dependency: PrismaDependency | null;
           };
           participationMechanism: PrismaParticipationMechanism;
+          event?: PrismaEvent | null;
         },
       ),
-      simiEventCode: subscriptionRegister.simiEventCode,
-      organizationRole: subscriptionRegister.organizationRole,
+      simiTopicId: subscriptionRegister.simiTopicId,
+      topic: subscriptionRegister.topic,
       createdAt: subscriptionRegister.createdAt,
       updatedAt: subscriptionRegister.updatedAt,
     };
@@ -55,16 +58,16 @@ export class SubscriptionRegister {
   registration: Registration;
 
   @ApiProperty({
-    description: 'The simi event code of the subscription register',
-    example: 'abc123',
+    description: 'The simi topic id of the subscription register',
+    example: '1',
   })
-  simiEventCode: string;
+  simiTopicId: string;
 
   @ApiProperty({
-    description: 'The organization role of the subscription register',
-    example: 'Organization Role',
+    description: 'The topic name of the subscription register',
+    example: 'salud',
   })
-  organizationRole: string | null;
+  topic: string;
 
   @ApiProperty({
     description: 'The created at of the subscription register',

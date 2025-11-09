@@ -1,12 +1,13 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty } from 'class-validator';
 import { CreateRegistrationDto } from './create-registration.dto';
 
 export class CreateSubscriptionRegisterDto extends CreateRegistrationDto {
-  @ApiPropertyOptional({
-    example: 'Organization Role',
+  @ApiProperty({
+    description: 'The simi topic id',
+    example: '1',
   })
-  @IsOptional()
-  @IsString({ message: 'El rol de la suscripción debe ser una cadena de texto' })
-  organizationRole?: string;
+  @IsNotEmpty({ message: 'El ID del tema de interés es requerido' })
+  @IsString({ message: 'El ID del tema de interés debe ser una cadena de texto' })
+  simiTopicId: string;
 }

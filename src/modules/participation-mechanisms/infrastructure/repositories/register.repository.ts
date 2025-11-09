@@ -36,47 +36,50 @@ export class RegisterRepository {
     this.validateEvent(createParticipationRegisterDto);
 
     const participationRegisterEntity = await this.prisma.$transaction(async (tx) => {
-      const activeEvent = await this.existActiveEvent(simiEventCode!);
+      const existingEvent = await tx.event.findFirst({
+        where: {
+          simiEventCode: simiEventCode || '',
+          status: true,
+        },
+      });
 
-      let event;
+      const eventData = {
+        simiEventCode: simiEventCode || '',
+        type: type || '',
+        description: description || '',
+        date: date || new Date(),
+        hour: hour || '',
+        place: place || '',
+        topic: topic || '',
+        specializedProfessional,
+        coordinator,
+        members: members as unknown as InputJsonValue,
+        speakers: speakers as unknown as string[],
+        status: true,
+      };
 
-      if (!activeEvent) {
-        event = await tx.event.create({
-          data: {
-            simiEventCode: simiEventCode || '',
-            type: type || '',
-            description: description || '',
-            date: date || new Date(),
-            hour: hour || '',
-            place: place || '',
-            topic: topic || '',
-            specializedProfessional,
-            coordinator,
-            members: members as unknown as InputJsonValue,
-            speakers: speakers as unknown as string[],
-          },
-        });
-      } else {
-        event = await tx.event.findFirst({
-          where: {
-            simiEventCode: simiEventCode || '',
-            status: true,
-          },
-        });
-      }
+      const event = existingEvent
+        ? await tx.event.update({
+            where: { id: existingEvent.id },
+            data: eventData,
+          })
+        : await tx.event.create({
+            data: eventData,
+          });
 
       const participationRegisterEntity = await tx.participationRegister.create({
         data: {
           ...participationRegister,
           simiEventCode: simiEventCode || '',
           registration: {
-            create: { userId, participationMechanismId, eventId: event!.id, simiEventCode: simiEventCode || '' },
+            create: { userId, participationMechanismId, eventId: event.id, simiEventCode: simiEventCode || '' },
           },
         },
         include: {
           registration: {
             include: {
               participationMechanism: true,
+              event: true,
               user: {
                 include: {
                   userType: true,
@@ -94,83 +97,77 @@ export class RegisterRepository {
   }
 
   async createSubscription(
-    createSubscriptionRegisterDto: CreateSubscriptionRegisterDto,
+    createSubscriptionRegisterDto: CreateSubscriptionRegisterDto & { topic: string },
   ): Promise<SubscriptionRegister> {
-    const {
-      userId,
-      simiEventCode,
-      participationMechanismId,
-      type,
-      date,
-      hour,
-      place,
-      topic,
-      specializedProfessional,
-      coordinator,
-      members,
-      speakers,
-      description,
-      ...subscriptionRegister
-    } = createSubscriptionRegisterDto;
+    const { userId, participationMechanismId, simiTopicId, topic } = createSubscriptionRegisterDto;
 
-    this.validateEvent(createSubscriptionRegisterDto);
-
-    const subscriptionRegisterEntity = await this.prisma.$transaction(async (tx) => {
-      const activeEvent = await this.existActiveEvent(simiEventCode!);
-
-      let event;
-
-      if (!activeEvent) {
-        event = await tx.event.create({
-          data: {
-            simiEventCode: simiEventCode || '',
-            type: type || '',
-            description: description || '',
-            date: date || new Date(),
-            hour: hour || '',
-            place: place || '',
-            topic: topic || '',
-            specializedProfessional,
-            coordinator,
-            members: members as unknown as InputJsonValue,
-            speakers: speakers as unknown as string[],
-          },
-        });
-      } else {
-        event = await tx.event.findFirst({
-          where: {
-            simiEventCode: simiEventCode || '',
-            status: true,
-          },
-        });
-      }
-
-      const subscriptionRegisterEntity = await tx.subscriptionRegister.create({
-        data: {
-          ...subscriptionRegister,
-          simiEventCode: simiEventCode || '',
-          registration: {
-            create: { userId, participationMechanismId, eventId: event!.id, simiEventCode: simiEventCode || '' },
+    const subscriptionRegisterEntity = await this.prisma.subscriptionRegister.create({
+      data: {
+        simiTopicId,
+        topic,
+        registration: {
+          create: {
+            userId,
+            participationMechanismId,
+            simiEventCode: null,
+            eventId: null,
           },
         },
-        include: {
-          registration: {
-            include: {
-              participationMechanism: true,
-              user: {
-                include: {
-                  userType: true,
-                  documentType: true,
-                  dependency: true,
-                },
+      },
+      include: {
+        registration: {
+          include: {
+            participationMechanism: true,
+            event: true,
+            user: {
+              include: {
+                userType: true,
+                documentType: true,
+                dependency: true,
               },
             },
           },
         },
-      });
-      return subscriptionRegisterEntity;
+      },
     });
+
     return SubscriptionRegister.fromPrisma(subscriptionRegisterEntity);
+  }
+
+  async deleteSubscription(subscriptionId: number): Promise<void> {
+    const subscriptionRegister = await this.prisma.subscriptionRegister.findUnique({
+      where: { id: subscriptionId },
+      include: {
+        registration: {
+          include: {
+            SubscriptionRegister: true,
+            ParticipationRegister: true,
+            ProposalRegister: true,
+          },
+        },
+      },
+    });
+
+    if (!subscriptionRegister) {
+      throw new NotFoundException(`Subscription register not found with id ${subscriptionId}`);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.subscriptionRegister.delete({
+        where: { id: subscriptionId },
+      });
+
+      const registration = subscriptionRegister.registration;
+      const hasOtherSubscriptions = registration.SubscriptionRegister.length > 1;
+      const hasParticipations = registration.ParticipationRegister.length > 0;
+      const hasProposals = registration.ProposalRegister.length > 0;
+
+      if (!hasOtherSubscriptions && !hasParticipations && !hasProposals) {
+        await tx.registration.delete({
+          where: { id: registration.id },
+        });
+      }
+    });
   }
 
   async createProposal(createProposalRegisterDto: CreateProposalRegisterDto): Promise<ProposalRegisterDetail> {
@@ -194,7 +191,7 @@ export class RegisterRepository {
         politicalTopicJustification,
         RegistrationCite: {
           create: cites.map((cite) => ({
-            userId,
+            userId: cite.userId,
             CiteQuestion: {
               create: cite.questions.map((question) => ({
                 question: question.question,
@@ -230,6 +227,13 @@ export class RegisterRepository {
         },
         RegistrationCite: {
           include: {
+            user: {
+              include: {
+                userType: true,
+                documentType: true,
+                dependency: true,
+              },
+            },
             CiteQuestion: true,
           },
         },
@@ -303,6 +307,18 @@ export class RegisterRepository {
     return event ? true : false;
   }
 
+  async existSubscriptionRegister(userId: number, simiTopicId: string): Promise<boolean> {
+    const subscriptionRegister = await this.prisma.subscriptionRegister.findFirst({
+      where: {
+        simiTopicId,
+        registration: {
+          userId,
+        },
+      },
+    });
+    return subscriptionRegister ? true : false;
+  }
+
   validateEvent(createRegistrationDto: CreateRegistrationDto): void {
     const { simiEventCode, description, date, hour, place } = createRegistrationDto;
 
@@ -317,16 +333,75 @@ export class RegisterRepository {
     if (!place) throw new BadRequestException('El lugar del evento es requerido');
   }
 
-  async answerCiteQuestion(citeQuestionId: number, answer: string, userId: number): Promise<void> {
+  async answerCiteQuestion(
+    citeQuestionId: number,
+    answer: string,
+    userId: number,
+  ): Promise<{
+    citeQuestion: {
+      id: number;
+      question: string;
+      answer: string;
+      answeredAt: Date;
+      registrationCite: {
+        user: {
+          id: number;
+          firstName: string;
+          lastName: string | null;
+          email: string;
+          dependency: {
+            name: string;
+          } | null;
+        };
+        proposalRegister: {
+          id: number;
+          simiEventCode: string | null;
+          politicalTopic: string | null;
+          registration: {
+            user: {
+              id: number;
+              firstName: string;
+              lastName: string | null;
+              email: string;
+            };
+          };
+        };
+      };
+    };
+  }> {
     const citeQuestion = await this.prisma.citeQuestion.findUnique({
       where: { id: citeQuestionId },
       include: {
         registrationCite: {
           include: {
-            user: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                dependency: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
             proposalRegister: {
               include: {
                 proposalStatus: true,
+                registration: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                      },
+                    },
+                  },
+                },
               },
             },
           },
@@ -346,13 +421,71 @@ export class RegisterRepository {
       throw new BadRequestException('No se pueden responder preguntas de propuestas rechazadas');
     }
 
-    await this.prisma.citeQuestion.update({
+    const updatedCiteQuestion = await this.prisma.citeQuestion.update({
       where: { id: citeQuestionId },
       data: {
         answer,
         answeredAt: new Date(),
       },
+      include: {
+        registrationCite: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                dependency: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+            proposalRegister: {
+              include: {
+                registration: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
+
+    return {
+      citeQuestion: {
+        id: updatedCiteQuestion.id,
+        question: updatedCiteQuestion.question,
+        answer: updatedCiteQuestion.answer || '',
+        answeredAt: updatedCiteQuestion.answeredAt || new Date(),
+        registrationCite: {
+          user: {
+            ...updatedCiteQuestion.registrationCite.user,
+            dependency: updatedCiteQuestion.registrationCite.user.dependency,
+          },
+          proposalRegister: {
+            id: updatedCiteQuestion.registrationCite.proposalRegister.id,
+            simiEventCode: updatedCiteQuestion.registrationCite.proposalRegister.simiEventCode,
+            politicalTopic: updatedCiteQuestion.registrationCite.proposalRegister.politicalTopic,
+            registration: {
+              user: updatedCiteQuestion.registrationCite.proposalRegister.registration.user,
+            },
+          },
+        },
+      },
+    };
   }
 
   async changeProposalStatus(proposalRegisterId: number, proposalStatusId: number): Promise<void> {

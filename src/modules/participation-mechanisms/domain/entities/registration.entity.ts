@@ -1,5 +1,6 @@
 import { User } from 'src/modules/users/domain/entities/user.entity';
 import { ParticipationMechanism } from './participation-mechanism.entity';
+import { Event } from './event.entity';
 import {
   Registration as PrismaRegistration,
   User as PrismaUser,
@@ -7,6 +8,7 @@ import {
   UserType as PrismaUserType,
   DocumentType as PrismaDocumentType,
   Dependency as PrismaDependency,
+  Event as PrismaEvent,
 } from '@prisma/client';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -19,6 +21,7 @@ export class Registration {
         dependency: PrismaDependency | null;
       };
       participationMechanism: PrismaParticipationMechanism;
+      event?: PrismaEvent | null;
     },
   ): Registration {
     return {
@@ -31,6 +34,7 @@ export class Registration {
         },
       ),
       participationMechanism: ParticipationMechanism.fromPrisma(registration.participationMechanism),
+      event: registration.event ? Event.fromPrisma(registration.event) : null,
       simiEventCode: registration.simiEventCode,
       createdAt: registration.createdAt,
       updatedAt: registration.updatedAt,
@@ -52,6 +56,11 @@ export class Registration {
     description: 'The participation mechanism of the registration',
   })
   participationMechanism: ParticipationMechanism;
+
+  @ApiPropertyOptional({
+    description: 'The event of the registration',
+  })
+  event?: Event | null;
 
   @ApiPropertyOptional({
     description: 'The simi event code of the registration',

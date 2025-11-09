@@ -8,12 +8,17 @@ import {
   AccidentalCommissionDetail,
   Event,
   AllEventsRegisteredUser,
+  InterestTopic,
+  SubscriptionRegister,
 } from '../../domain/entities';
 import { EventRegisteredUser } from '../../domain/entities/event-registered-user.entity';
+import { SubscriptionRegisteredUser } from '../../domain/entities/subscription-registered-user.entity';
 import { ProposalRegister } from '../../domain/entities/proposal-register.entity';
 import { PaginationType } from 'src/modules/common/domain/interfaces/pagination.interface';
 import { GetEventsDto } from '../../application/dto/get-events.dto';
 import { GetEventRegisteredUsersDto } from '../../application/dto/get-event-registered-users.dto';
+import { GetSubscriptionsDto } from '../../application/dto/get-subscriptions.dto';
+import { GetSubscriptionRegisteredUsersDto } from '../../application/dto/get-subscription-registered-users.dto';
 import { GetProposalsDto } from '../../application/dto/get-proposals.dto';
 import { GetProposalsByCitationsDto } from '../../application/dto/get-proposals-by-citations.dto';
 import { AnswerCiteQuestionDto } from '../../application/dto/answer-cite-question.dto';
@@ -75,6 +80,12 @@ export class ParticipationMechanismsController {
   @ApiOkResponse({ type: AccidentalCommissionDetail })
   getAccidentalCommissionDetail(@Param('id') id: string): Promise<AccidentalCommissionDetail> {
     return this.participationMechanismService.getAccidentalCommissionDetail(id);
+  }
+
+  @Get('interest-topics')
+  @ApiOkResponse({ type: InterestTopic, isArray: true })
+  getInterestTopics(): Promise<InterestTopic[]> {
+    return this.participationMechanismService.getInterestTopics();
   }
 
   @UseGuards(AuthGuard())
@@ -241,5 +252,35 @@ export class ParticipationMechanismsController {
     await this.participationMechanismService.reactivateEvent(reactivateEventDto);
 
     return { message: 'Evento reactivado correctamente' };
+  }
+
+  @UseGuards(AuthGuard())
+  @ApiBearerAuth()
+  @Get('subscriptions')
+  @ApiOkResponse({ type: SubscriptionRegister, isArray: true })
+  getAllSubscriptions(@Query() getSubscriptionsDto: GetSubscriptionsDto): Promise<PaginationType<SubscriptionRegister>> {
+    return this.participationMechanismService.getAllSubscriptions(getSubscriptionsDto);
+  }
+
+  @UseGuards(AuthGuard())
+  @ApiBearerAuth()
+  @Get('subscriptions/:simiTopicId/registered-users')
+  @ApiOkResponse({ type: SubscriptionRegisteredUser, isArray: true })
+  async getSubscriptionRegisteredUsers(
+    @Param('simiTopicId') simiTopicId: string,
+    @Query() getSubscriptionRegisteredUsersDto: GetSubscriptionRegisteredUsersDto,
+  ): Promise<SubscriptionRegisteredUser[]> {
+    return await this.participationMechanismService.getSubscriptionRegisteredUsers(
+      simiTopicId,
+      getSubscriptionRegisteredUsersDto,
+    );
+  }
+
+  @UseGuards(AuthGuard())
+  @ApiBearerAuth()
+  @Get('subscriptions/excel')
+  @ApiOkResponse({ type: String })
+  async getAllSubscriptionsExcel(@Query() getSubscriptionsDto: GetSubscriptionsDto): Promise<string> {
+    return await this.participationMechanismService.getAllSubscriptionsExcel(getSubscriptionsDto);
   }
 }

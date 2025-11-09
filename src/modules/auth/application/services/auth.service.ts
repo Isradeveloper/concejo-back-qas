@@ -17,6 +17,7 @@ import { RefreshTokenPayload } from '../../domain/interfaces/jwt-auth-payload';
 import { LoginWithPasswordDto } from '../dto/login-with-password.dto';
 import { CreateCitizenUserDto } from 'src/modules/users/application/dto/create-citizen-user.dto';
 import { TokenService } from 'src/modules/common/application/services/token.service';
+import { MailTemplate } from 'src/modules/common/infrastructure/utils/mail-templates.util';
 
 @Injectable()
 export class AuthService {
@@ -49,7 +50,10 @@ export class AuthService {
     await this.mailerService.sendEmail({
       to: userUpdated.email,
       subject: 'Código de verificación',
-      htmlBody: `Tu código de verificación es: ${saveCode.code}`,
+      htmlBody: new MailTemplate(
+        'Código de verificación',
+        `<div style="text-align: center;"><span style="font-size: 15px;">Hola ${user.firstName} ${user.lastName} 👋, te compartimos tu código de verificación: </span> <br/> <br/> <span style="font-size: 25px; font-weight: bold;">${saveCode.code}</span></div>`,
+      ).render(),
     });
 
     return { ...userUpdated, token: this.tokenService.generateAccessToken(userUpdated.id) };
@@ -60,9 +64,12 @@ export class AuthService {
     const saveCode = this.codeService.generateSaveCode('isVerification');
     await this.codeService.saveCode(user.id, saveCode);
     await this.mailerService.sendEmail({
-      to: user.email,
+      to: email,
       subject: 'Código de verificación',
-      htmlBody: `Tu código de verificación es: ${saveCode.code}`,
+      htmlBody: new MailTemplate(
+        'Código de verificación',
+        `<div style="text-align: center;"><span style="font-size: 15px;">Hola ${user.firstName} ${user.lastName} 👋, te compartimos tu código de verificación: </span> <br/> <br/> <span style="font-size: 25px; font-weight: bold;">${saveCode.code}</span></div>`,
+      ).render(),
     });
     return { message: 'Código de verificación enviado' };
   }
@@ -73,9 +80,12 @@ export class AuthService {
     await this.codeService.verifyCode(user.id, verifyEmailDto.code);
 
     await this.mailerService.sendEmail({
-      to: user.email,
+      to: verifyEmailDto.email,
       subject: 'Email verificado correctamente',
-      htmlBody: 'Tu email ha sido verificado correctamente',
+      htmlBody: new MailTemplate(
+        'Email verificado correctamente',
+        `<div style="text-align: center;"><span style="font-size: 15px;">Hola ${user.firstName} ${user.lastName} 👋, tu email ha sido verificado correctamente</span></div>`,
+      ).render(),
     });
 
     return { message: 'Email verificado correctamente', token: this.jwtService.sign({ id: user.id }) };
@@ -156,7 +166,10 @@ export class AuthService {
     await this.mailerService.sendEmail({
       to: email,
       subject: 'Código de inicio de sesión',
-      htmlBody: `Tu código de inicio de sesión es: ${saveCode.code}`,
+      htmlBody: new MailTemplate(
+        'Código de inicio de sesión',
+        `<div style="text-align: center;"><span style="font-size: 15px;">Hola ${user.firstName} ${user.lastName} 👋, te compartimos tu código de inicio de sesión: </span> <br/> <br/> <span style="font-size: 25px; font-weight: bold;">${saveCode.code}</span></div>`,
+      ).render(),
     });
 
     return { message: 'Código de inicio de sesión enviado' };
@@ -177,5 +190,58 @@ export class AuthService {
       ...updatedUser,
       token: this.tokenService.generateAccessToken(user.id),
     };
+  }
+
+  async generatePasswordRecoveryCode(email: string): Promise<MessageResponseClass> {
+    const user = await this.usersService.findOneByEmail(email);
+
+    const hasPassword = await this.usersService.userHasPassword(user.id);
+    if (!hasPassword) {
+      throw new BadRequestException('Este usuario no tiene contraseña configurada');
+    }
+
+    const saveCode = this.codeService.generateSaveCode('isPasswordRecovery');
+
+    await this.codeService.saveCode(user.id, saveCode);
+
+    await this.mailerService.sendEmail({
+      to: email,
+      subject: 'Código de recuperación de contraseña',
+      htmlBody: new MailTemplate(
+        'Código de recuperación de contraseña',
+        `<div style="text-align: center;"><span style="font-size: 15px;">Hola ${user.firstName} ${user.lastName} 👋, te compartimos tu código de recuperación de contraseña: </span> <br/> <br/> <span style="font-size: 25px; font-weight: bold;">${saveCode.code}</span></div>`,
+      ).render(),
+    });
+
+    return { message: 'Código de recuperación de contraseña enviado' };
+  }
+
+  async verifyPasswordRecoveryCode(email: string, code: string): Promise<MessageResponseClass> {
+    const user = await this.usersService.findOneByEmail(email);
+
+    await this.codeService.verifyPasswordRecoveryCode(user.id, code);
+
+    return { message: 'Código de recuperación de contraseña verificado correctamente' };
+  }
+
+  async changePassword(email: string, code: string, newPassword: string): Promise<MessageResponseClass> {
+    const user = await this.usersService.findOneByEmail(email);
+
+    await this.codeService.markPasswordRecoveryCodeAsUsed(user.id, code);
+
+    const hashedPassword: string = await bcrypt.hash(newPassword, 10);
+
+    await this.usersService.updatePassword(user.id, hashedPassword);
+
+    await this.mailerService.sendEmail({
+      to: email,
+      subject: 'Contraseña cambiada exitosamente',
+      htmlBody: new MailTemplate(
+        'Contraseña cambiada exitosamente',
+        `<div style="text-align: center;"><span style="font-size: 15px;">Hola ${user.firstName} ${user.lastName} 👋, tu contraseña ha sido cambiada exitosamente. Si no realizaste este cambio, por favor contacta con soporte.</span></div>`,
+      ).render(),
+    });
+
+    return { message: 'Contraseña cambiada exitosamente' };
   }
 }

@@ -12,3 +12,18 @@ export const getCurrentDate = (): CurrentDate => {
     day: date.getDate(),
   };
 };
+
+export const formatLongDate = (date: Date | string) => {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+
+  if (isNaN(dateObj.getTime())) {
+    return 'Invalid date';
+  }
+
+  const dayName = dateObj.toLocaleDateString('es-ES', { weekday: 'long' });
+  const day = dateObj.toLocaleDateString('es-ES', { day: '2-digit' });
+  const month = dateObj.toLocaleDateString('es-ES', { month: 'long' });
+  const year = dateObj.toLocaleDateString('es-ES', { year: 'numeric' });
+
+  return `${dayName}, ${day} de ${month} de ${year}`;
+};

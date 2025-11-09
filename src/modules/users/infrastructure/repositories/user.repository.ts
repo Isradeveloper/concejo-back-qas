@@ -1,15 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/modules/prisma/application/services/prisma.service';
+import { Prisma } from '@prisma/client';
 import { User } from '../../domain/entities/user.entity';
 import { CreateCitizenUserDto } from '../../application/dto/create-citizen-user.dto';
 import { SaveCode } from 'src/modules/common/domain/interfaces/save-code.interface';
 import { UpdateUserDto } from '../../application/dto/update-user.dto';
 import { UserTypeRepository } from './user-type.repository';
 import { CreateUserDto } from '../../application/dto/create-user.dto';
-import { PaginationDto } from 'src/modules/common/application/dto/pagination.dto';
 import { PaginationType } from 'src/modules/common/domain/interfaces/pagination.interface';
 import { PaginationUtil } from 'src/modules/common/infrastructure/utils/pagination.util';
 import { CitedUser } from '../../domain/entities/cited-user.entity';
+import { GetUsersDto } from '../../application/dto/get-users.dto';
 
 @Injectable()
 export class UserRepository {
@@ -44,6 +45,33 @@ export class UserRepository {
       include: { userType: true, documentType: true, dependency: true },
     });
     if (user) throw new BadRequestException(`Usuario ya existe con email ${email}`);
+    return true;
+  }
+
+  async validateUniqueDocumentNumber(
+    documentNumber: string,
+    documentTypeId: number,
+    excludeUserId?: number,
+  ): Promise<boolean> {
+    const whereCondition: Prisma.UserWhereInput = {
+      documentNumber,
+      documentTypeId,
+    };
+
+    if (excludeUserId) {
+      whereCondition.id = { not: excludeUserId };
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: whereCondition,
+    });
+
+    if (user) {
+      throw new BadRequestException(
+        `Ya existe un usuario con el número de documento ${documentNumber} para el tipo de documento seleccionado`,
+      );
+    }
+
     return true;
   }
 
@@ -121,29 +149,49 @@ export class UserRepository {
     return user.password;
   }
 
-  async getAllUsers(paginationDto: PaginationDto): Promise<PaginationType<User>> {
-    const orderBy = paginationDto.orderBy ?? 'id';
-    const orderDirection = paginationDto.orderDirection ?? 'desc';
+  async userHasPassword(id: number): Promise<boolean> {
+    const user = await this.prisma.user.findFirst({
+      where: { id },
+      select: {
+        password: true,
+      },
+    });
+    if (!user) throw new NotFoundException(`Usuario no encontrado con id ${id}`);
+
+    return user.password !== null;
+  }
+
+  async getAllUsers(getUsersDto: GetUsersDto): Promise<PaginationType<User>> {
+    const orderBy = getUsersDto.orderBy ?? 'id';
+    const orderDirection = getUsersDto.orderDirection ?? 'desc';
+
+    const whereCondition: Prisma.UserWhereInput = {};
+
+    if (getUsersDto.search) {
+      whereCondition.OR = [
+        { firstName: { contains: getUsersDto.search, mode: 'insensitive' } },
+        { lastName: { contains: getUsersDto.search, mode: 'insensitive' } },
+        { documentNumber: { contains: getUsersDto.search, mode: 'insensitive' } },
+        { email: { contains: getUsersDto.search, mode: 'insensitive' } },
+        { phoneNumber: { contains: getUsersDto.search, mode: 'insensitive' } },
+        { documentType: { name: { contains: getUsersDto.search, mode: 'insensitive' } } },
+        { userType: { name: { contains: getUsersDto.search, mode: 'insensitive' } } },
+        { dependency: { name: { contains: getUsersDto.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (getUsersDto.userTypeId) {
+      whereCondition.userTypeId = getUsersDto.userTypeId;
+    }
 
     return this.paginationUtil.getPaginatedPrismaData<User>({
-      paginationDto,
+      paginationDto: getUsersDto,
       prismaQuery: () =>
         this.prisma.user
           .findMany({
             include: { userType: true, documentType: true, dependency: true },
-            where: {
-              OR: [
-                { firstName: { contains: paginationDto.search, mode: 'insensitive' } },
-                { lastName: { contains: paginationDto.search, mode: 'insensitive' } },
-                { documentNumber: { contains: paginationDto.search, mode: 'insensitive' } },
-                { email: { contains: paginationDto.search, mode: 'insensitive' } },
-                { phoneNumber: { contains: paginationDto.search, mode: 'insensitive' } },
-                { documentType: { name: { contains: paginationDto.search, mode: 'insensitive' } } },
-                { userType: { name: { contains: paginationDto.search, mode: 'insensitive' } } },
-                { dependency: { name: { contains: paginationDto.search, mode: 'insensitive' } } },
-              ],
-            },
-            ...this.paginationUtil.getSkipAndTake(paginationDto),
+            where: whereCondition,
+            ...this.paginationUtil.getSkipAndTake(getUsersDto),
             orderBy: {
               [orderBy]: orderDirection,
             },
@@ -151,25 +199,17 @@ export class UserRepository {
           .then((users) => users.map((user) => User.fromPrisma(user))),
       countQuery: () =>
         this.prisma.user.count({
-          where: {
-            OR: [
-              { firstName: { contains: paginationDto.search, mode: 'insensitive' } },
-              { lastName: { contains: paginationDto.search, mode: 'insensitive' } },
-              { documentNumber: { contains: paginationDto.search, mode: 'insensitive' } },
-              { email: { contains: paginationDto.search, mode: 'insensitive' } },
-              { phoneNumber: { contains: paginationDto.search, mode: 'insensitive' } },
-              { documentType: { name: { contains: paginationDto.search, mode: 'insensitive' } } },
-              { userType: { name: { contains: paginationDto.search, mode: 'insensitive' } } },
-              { dependency: { name: { contains: paginationDto.search, mode: 'insensitive' } } },
-            ],
-          },
+          where: whereCondition,
         }),
     });
   }
 
-  async delete(id: number): Promise<User> {
-    const user = await this.prisma.user.delete({
+  async changeStatus(id: number, status: boolean): Promise<User> {
+    const newStatus = status === true ? false : true;
+
+    const user = await this.prisma.user.update({
       where: { id },
+      data: { status: newStatus, deletedAt: newStatus === true ? null : new Date() },
       include: { userType: true, documentType: true, dependency: true },
     });
     return User.fromPrisma(user);
@@ -248,5 +288,17 @@ export class UserRepository {
         `Los siguientes usuarios no existen o no son de tipo 'Citados': ${nonExistentUserIds.join(', ')}`,
       );
     }
+  }
+
+  async updatePassword(id: number, hashedPassword: string): Promise<User> {
+    await this.findOneById(id);
+
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: { password: hashedPassword },
+      include: { userType: true, documentType: true, dependency: true },
+    });
+
+    return User.fromPrisma(user);
   }
 }

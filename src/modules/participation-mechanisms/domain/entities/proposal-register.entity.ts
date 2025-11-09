@@ -26,7 +26,6 @@ export class ProposalRegister {
       simiEventCode: proposalRegister.simiEventCode,
       politicalTopic: proposalRegister.politicalTopic,
       politicalTopicJustification: proposalRegister.politicalTopicJustification,
-      files: proposalRegister.files,
       proposalStatus: proposalRegister.proposalStatus,
       registration: proposalRegister.registration,
       RegistrationCite: proposalRegister.RegistrationCite,
@@ -58,12 +57,6 @@ export class ProposalRegister {
     example: 'This topic is important for the community',
   })
   politicalTopicJustification: string | null;
-
-  @ApiProperty({
-    description: 'Files associated with the proposal',
-    example: ['document1.pdf', 'document2.pdf'],
-  })
-  files: unknown;
 
   @ApiProperty({
     description: 'The proposal status of the proposal register',

@@ -11,6 +11,14 @@ import { CreateCiteDto } from '../dto/create-cite.dto';
 import { AnswerCiteQuestionDto } from '../dto/answer-cite-question.dto';
 import { ChangeProposalStatusDto } from '../dto/change-proposal-status.dto';
 import { ProposalRegisterDetail } from '../../domain/entities';
+import { MailerService } from 'src/modules/common/application/services/mailer.service';
+import { ParticipationMailUtil } from '../../infrastructure/utils/participation-mail.util';
+import {
+  ProposalMailUtil,
+  ProposalCiteMailUtil,
+  ProposalAnswerMailUtil,
+} from '../../infrastructure/utils/proposal-mail.util';
+import { typesInSpanish } from '../../domain/constants/register-types.constants';
 
 @Injectable()
 export class RegisterService {
@@ -18,6 +26,7 @@ export class RegisterService {
     private readonly participationRegisterRepository: RegisterRepository,
     private readonly usersService: UsersService,
     private readonly participationMechanismService: ParticipationMechanismService,
+    private readonly mailerService: MailerService,
   ) {}
 
   async createParticipation(
@@ -35,24 +44,40 @@ export class RegisterService {
       organizationEmail: createParticipationRegisterDto.organizationEmail,
     });
 
-    return await this.participationRegisterRepository.createParticipation(createParticipationRegisterDto);
+    const participationRegister =
+      await this.participationRegisterRepository.createParticipation(createParticipationRegisterDto);
+
+    await this.mailerService.sendEmail({
+      to: participationRegister.registration.user.email,
+      subject: `Registro de participación exitoso ${typesInSpanish[participationRegister.registration.event?.type as keyof typeof typesInSpanish]}  ${participationRegister.registration.event?.simiEventCode}`,
+      htmlBody: new ParticipationMailUtil(participationRegister).render(),
+    });
+
+    return participationRegister;
   }
 
   async createSubscription(
     createSubscriptionRegisterDto: CreateSubscriptionRegisterDto,
   ): Promise<SubscriptionRegister> {
-    await this.validateUserAndParticipationMechanism(
+    await this.usersService.findOneById(createSubscriptionRegisterDto.userId);
+
+    const interestTopic = await this.validateInterestTopic(createSubscriptionRegisterDto.simiTopicId);
+
+    await this.validateSubscriptionDuplicates(
       createSubscriptionRegisterDto.userId,
-      createSubscriptionRegisterDto.simiEventCode || '',
+      createSubscriptionRegisterDto.simiTopicId,
     );
 
-    await this.validateParticipationRegisterDuplicates({
-      userId: createSubscriptionRegisterDto.userId,
-      simiEventCode: createSubscriptionRegisterDto.simiEventCode || '',
-      ownUser: false,
-    });
+    const subscriptionDtoWithTopic = {
+      ...createSubscriptionRegisterDto,
+      topic: interestTopic.topic || '',
+    };
 
-    return await this.participationRegisterRepository.createSubscription(createSubscriptionRegisterDto);
+    return await this.participationRegisterRepository.createSubscription(subscriptionDtoWithTopic);
+  }
+
+  async deleteSubscription(subscriptionId: number): Promise<void> {
+    return await this.participationRegisterRepository.deleteSubscription(subscriptionId);
   }
 
   async createProposal(createProposalRegisterDto: CreateProposalRegisterDto): Promise<ProposalRegisterDetail> {
@@ -64,7 +89,32 @@ export class RegisterService {
       await this.validateUniqueCites(createProposalRegisterDto.cites);
     }
 
-    return await this.participationRegisterRepository.createProposal(createProposalRegisterDto);
+    const proposalRegister = await this.participationRegisterRepository.createProposal(createProposalRegisterDto);
+
+    if (proposalRegister.registration && proposalRegister.registration.user) {
+      const creatorUser = proposalRegister.registration.user;
+      if (creatorUser.email) {
+        await this.mailerService.sendEmail({
+          to: creatorUser.email,
+          subject: `Propuesta ciudadana Nº ${proposalRegister.id} creada exitosamente`,
+          htmlBody: new ProposalMailUtil(proposalRegister).render(),
+        });
+      }
+    }
+
+    if (proposalRegister.registrationCites && proposalRegister.registrationCites.length > 0) {
+      for (const registrationCite of proposalRegister.registrationCites) {
+        if (registrationCite.user && registrationCite.user.email) {
+          await this.mailerService.sendEmail({
+            to: registrationCite.user.email,
+            subject: `Has sido citado en la propuesta ciudadana Nº ${proposalRegister.id}`,
+            htmlBody: new ProposalCiteMailUtil(proposalRegister, registrationCite).render(),
+          });
+        }
+      }
+    }
+
+    return proposalRegister;
   }
 
   private async validateUserAndParticipationMechanism(userId: number, simiEventCode: string): Promise<void> {
@@ -131,7 +181,34 @@ export class RegisterService {
   }
 
   async answerCiteQuestion(citeQuestionId: number, answerDto: AnswerCiteQuestionDto, userId: number): Promise<void> {
-    await this.participationRegisterRepository.answerCiteQuestion(citeQuestionId, answerDto.answer, userId);
+    const result = await this.participationRegisterRepository.answerCiteQuestion(
+      citeQuestionId,
+      answerDto.answer,
+      userId,
+    );
+
+    const creatorUser = result.citeQuestion.registrationCite.proposalRegister.registration.user;
+    const citedUser = result.citeQuestion.registrationCite.user;
+    const proposalRegister = result.citeQuestion.registrationCite.proposalRegister;
+
+    if (creatorUser && creatorUser.email) {
+      await this.mailerService.sendEmail({
+        to: creatorUser.email,
+        subject: `Respuesta recibida en la propuesta ciudadana Nº ${proposalRegister.id}`,
+        htmlBody: new ProposalAnswerMailUtil({
+          proposalId: proposalRegister.id,
+          simiEventCode: proposalRegister.simiEventCode,
+          politicalTopic: proposalRegister.politicalTopic,
+          creatorFirstName: creatorUser.firstName,
+          creatorLastName: creatorUser.lastName || null,
+          citedUserFirstName: citedUser.firstName,
+          citedUserLastName: citedUser.lastName || null,
+          citedUserDependency: citedUser.dependency?.name || null,
+          question: result.citeQuestion.question,
+          answer: result.citeQuestion.answer,
+        }).render(),
+      });
+    }
   }
 
   async changeProposalStatus(
@@ -142,5 +219,24 @@ export class RegisterService {
       proposalRegisterId,
       changeProposalStatusDto.proposalStatusId,
     );
+  }
+
+  private async validateInterestTopic(simiTopicId: string) {
+    const interestTopics = await this.participationMechanismService.getInterestTopics();
+    const topic = interestTopics.find((topic) => topic.id?.toString() === simiTopicId);
+
+    if (!topic) {
+      throw new BadRequestException(`El tema de interés con ID ${simiTopicId} no existe`);
+    }
+
+    return topic;
+  }
+
+  private async validateSubscriptionDuplicates(userId: number, simiTopicId: string): Promise<void> {
+    const exists = await this.participationRegisterRepository.existSubscriptionRegister(userId, simiTopicId);
+
+    if (exists) {
+      throw new BadRequestException('El usuario ya está suscrito a este tema de interés');
+    }
   }
 }
