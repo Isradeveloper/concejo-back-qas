@@ -1,5 +1,5 @@
 import { RegisterRepository } from '../../infrastructure/repositories/register.repository';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateParticipationRegisterDto } from '../dto/create-participation-register.dto';
 import { ParticipationRegister } from '../../domain/entities/participation-register.entity';
 import { UsersService } from 'src/modules/users/application/services/user.service';
@@ -18,6 +18,7 @@ import {
   ProposalCiteMailUtil,
   ProposalAnswerMailUtil,
 } from '../../infrastructure/utils/proposal-mail.util';
+import { EventCancellationMailUtil } from '../../infrastructure/utils/event-cancellation-mail.util';
 import { typesInSpanish } from '../../domain/constants/register-types.constants';
 
 @Injectable()
@@ -78,6 +79,37 @@ export class RegisterService {
 
   async deleteSubscription(subscriptionId: number): Promise<void> {
     return await this.participationRegisterRepository.deleteSubscription(subscriptionId);
+  }
+
+  async cancelEventRegistration(participationRegisterId: number, userId: number): Promise<void> {
+    const participationRegister =
+      await this.participationRegisterRepository.findParticipationRegisterById(participationRegisterId);
+
+    if (!participationRegister) {
+      throw new NotFoundException('Registro de participación no encontrado');
+    }
+
+    if (participationRegister.registration.user.id !== userId) {
+      throw new BadRequestException('No tienes permisos para cancelar este registro');
+    }
+
+    if (!participationRegister.registration.event) {
+      throw new BadRequestException('El registro no está asociado a un evento');
+    }
+
+    const cancelledParticipationRegister =
+      await this.participationRegisterRepository.deleteParticipation(participationRegisterId);
+
+    const eventType = cancelledParticipationRegister.registration.event?.type
+      ? typesInSpanish[cancelledParticipationRegister.registration.event.type as keyof typeof typesInSpanish]
+      : '';
+    const eventCode = cancelledParticipationRegister.registration.event?.simiEventCode || '';
+
+    await this.mailerService.sendEmail({
+      to: cancelledParticipationRegister.registration.user.email,
+      subject: `Cancelación de registro ${eventType} ${eventCode}`.trim(),
+      htmlBody: new EventCancellationMailUtil(cancelledParticipationRegister).render(),
+    });
   }
 
   async createProposal(createProposalRegisterDto: CreateProposalRegisterDto): Promise<ProposalRegisterDetail> {

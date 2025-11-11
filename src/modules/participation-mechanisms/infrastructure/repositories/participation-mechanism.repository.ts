@@ -84,6 +84,9 @@ export class ParticipationMechanismRepository {
         Registration: {
           some: {
             userId: getEventsDto.userId,
+            ParticipationRegister: {
+              some: {},
+            },
           },
         },
       }),

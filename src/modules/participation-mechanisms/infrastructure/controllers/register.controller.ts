@@ -8,6 +8,8 @@ import { CreateSubscriptionRegisterDto } from '../../application/dto/create-subs
 import { SubscriptionRegister } from '../../domain/entities/subsciption-register.entity';
 import { ProposalRegisterDetail } from '../../domain/entities';
 import { CreateProposalRegisterDto } from '../../application/dto/create-proposal-register.dto';
+import { GetUser } from 'src/modules/common/infrastructure/decorators/get-user.decorator';
+import { User } from 'src/modules/users/domain/entities/user.entity';
 
 @ApiTags('registers')
 @Controller('registers')
@@ -22,6 +24,16 @@ export class RegistersController {
     return this.registerService.createParticipation(createParticipationRegisterDto);
   }
 
+  @Delete('participation/:id')
+  @ApiOkResponse({ description: 'Evento Cancelado Correctamente' })
+  async cancelEventRegistration(
+    @Param('id', ParseIntPipe) id: number,
+    @GetUser() user: User,
+  ): Promise<{ message: string }> {
+    await this.registerService.cancelEventRegistration(id, user.id);
+    return { message: 'Evento Cancelado Correctamente' };
+  }
+
   @Post('subscription')
   @ApiOkResponse({ type: SubscriptionRegister })
   createSubscription(
@@ -31,10 +43,10 @@ export class RegistersController {
   }
 
   @Delete('subscription/:id')
-  @ApiOkResponse({ description: 'Subscription deleted successfully' })
+  @ApiOkResponse({ description: 'Suscripción eliminada correctamente' })
   async deleteSubscription(@Param('id', ParseIntPipe) id: number): Promise<{ message: string }> {
     await this.registerService.deleteSubscription(id);
-    return { message: 'Subscription deleted successfully' };
+    return { message: 'Suscripción eliminada correctamente' };
   }
 
   @Post('proposal')

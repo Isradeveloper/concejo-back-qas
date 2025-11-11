@@ -513,4 +513,64 @@ export class RegisterRepository {
       },
     });
   }
+
+  async findParticipationRegisterById(participationRegisterId: number): Promise<ParticipationRegister | null> {
+    const participationRegister = await this.prisma.participationRegister.findUnique({
+      where: { id: participationRegisterId },
+      include: {
+        registration: {
+          include: {
+            participationMechanism: true,
+            event: true,
+            user: {
+              include: {
+                userType: true,
+                documentType: true,
+                dependency: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!participationRegister) {
+      return null;
+    }
+
+    return ParticipationRegister.fromPrisma(participationRegister);
+  }
+
+  async deleteParticipation(participationRegisterId: number): Promise<ParticipationRegister> {
+    const participationRegister = await this.prisma.participationRegister.findUnique({
+      where: { id: participationRegisterId },
+      include: {
+        registration: {
+          include: {
+            participationMechanism: true,
+            event: true,
+            user: {
+              include: {
+                userType: true,
+                documentType: true,
+                dependency: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!participationRegister) {
+      throw new NotFoundException(`Registro de participación no encontrado con id ${participationRegisterId}`);
+    }
+
+    const participationRegisterEntity = ParticipationRegister.fromPrisma(participationRegister);
+
+    await this.prisma.participationRegister.delete({
+      where: { id: participationRegisterId },
+    });
+
+    return participationRegisterEntity;
+  }
 }
