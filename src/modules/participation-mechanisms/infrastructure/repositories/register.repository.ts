@@ -149,7 +149,7 @@ export class RegisterRepository {
     });
 
     if (!subscriptionRegister) {
-      throw new NotFoundException(`Subscription register not found with id ${subscriptionId}`);
+      throw new NotFoundException(`No se encontró la suscripción con id ${subscriptionId}`);
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -572,5 +572,32 @@ export class RegisterRepository {
     });
 
     return participationRegisterEntity;
+  }
+
+  async findSubscriptionById(subscriptionId: number): Promise<SubscriptionRegister | null> {
+    const subscriptionRegister = await this.prisma.subscriptionRegister.findUnique({
+      where: { id: subscriptionId },
+      include: {
+        registration: {
+          include: {
+            participationMechanism: true,
+            event: true,
+            user: {
+              include: {
+                userType: true,
+                documentType: true,
+                dependency: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!subscriptionRegister) {
+      return null;
+    }
+
+    return SubscriptionRegister.fromPrisma(subscriptionRegister);
   }
 }

@@ -10,7 +10,7 @@ import { CreateProposalRegisterDto } from '../dto/create-proposal-register.dto';
 import { CreateCiteDto } from '../dto/create-cite.dto';
 import { AnswerCiteQuestionDto } from '../dto/answer-cite-question.dto';
 import { ChangeProposalStatusDto } from '../dto/change-proposal-status.dto';
-import { ProposalRegisterDetail } from '../../domain/entities';
+import { InterestTopic, ProposalRegisterDetail } from '../../domain/entities';
 import { MailerService } from 'src/modules/common/application/services/mailer.service';
 import { ParticipationMailUtil } from '../../infrastructure/utils/participation-mail.util';
 import {
@@ -19,7 +19,13 @@ import {
   ProposalAnswerMailUtil,
 } from '../../infrastructure/utils/proposal-mail.util';
 import { EventCancellationMailUtil } from '../../infrastructure/utils/event-cancellation-mail.util';
+import {
+  SubscriptionMailUtil,
+  SubscriptionCancellationMailUtil,
+} from '../../infrastructure/utils/subscription-mail.util';
 import { typesInSpanish } from '../../domain/constants/register-types.constants';
+import { HttpService } from '@nestjs/axios';
+import { envVars } from 'src/config/envs';
 
 @Injectable()
 export class RegisterService {
@@ -28,6 +34,7 @@ export class RegisterService {
     private readonly usersService: UsersService,
     private readonly participationMechanismService: ParticipationMechanismService,
     private readonly mailerService: MailerService,
+    private readonly httpService: HttpService,
   ) {}
 
   async createParticipation(
@@ -60,7 +67,7 @@ export class RegisterService {
   async createSubscription(
     createSubscriptionRegisterDto: CreateSubscriptionRegisterDto,
   ): Promise<SubscriptionRegister> {
-    await this.usersService.findOneById(createSubscriptionRegisterDto.userId);
+    const user = await this.usersService.findOneById(createSubscriptionRegisterDto.userId);
 
     const interestTopic = await this.validateInterestTopic(createSubscriptionRegisterDto.simiTopicId);
 
@@ -74,11 +81,55 @@ export class RegisterService {
       topic: interestTopic.topic || '',
     };
 
-    return await this.participationRegisterRepository.createSubscription(subscriptionDtoWithTopic);
+    const { data } = await this.httpService.axiosRef.get(
+      `${envVars.API_SIMI_URL}/participacion?correo=${user!.email}&tema=${interestTopic.topic}&subscribe=1`,
+    );
+
+    if (data['error'] || data['success'] !== '200') {
+      throw new BadRequestException('No fue posible crear la suscripción en SIMI');
+    }
+
+    const subscriptionRegister =
+      await this.participationRegisterRepository.createSubscription(subscriptionDtoWithTopic);
+
+    if (
+      subscriptionRegister.registration &&
+      subscriptionRegister.registration.user &&
+      subscriptionRegister.registration.user.email
+    ) {
+      await this.mailerService.sendEmail({
+        to: subscriptionRegister.registration.user.email,
+        subject: `Suscripción exitosa al tema de interés: ${subscriptionRegister.topic}`,
+        htmlBody: new SubscriptionMailUtil(subscriptionRegister).render(),
+      });
+    }
+
+    return subscriptionRegister;
   }
 
   async deleteSubscription(subscriptionId: number): Promise<void> {
-    return await this.participationRegisterRepository.deleteSubscription(subscriptionId);
+    const subscription = await this.participationRegisterRepository.findSubscriptionById(subscriptionId);
+
+    if (!subscription) {
+      throw new NotFoundException('Suscripción no encontrada');
+    }
+
+    const { data } = await this.httpService.axiosRef.get(
+      `${envVars.API_SIMI_URL}/participacion?correo=${subscription.registration.user.email}&tema=${subscription.topic}&subscribe=0`,
+    );
+    if (data['error'] || data['success'] !== '200') {
+      throw new BadRequestException('No fue posible eliminar la suscripción en SIMI');
+    }
+
+    await this.participationRegisterRepository.deleteSubscription(subscriptionId);
+
+    if (subscription.registration && subscription.registration.user && subscription.registration.user.email) {
+      await this.mailerService.sendEmail({
+        to: subscription.registration.user.email,
+        subject: `Cancelación de suscripción al tema de interés: ${subscription.topic}`,
+        htmlBody: new SubscriptionCancellationMailUtil(subscription).render(),
+      });
+    }
   }
 
   async cancelEventRegistration(participationRegisterId: number, userId: number): Promise<void> {
@@ -253,7 +304,7 @@ export class RegisterService {
     );
   }
 
-  private async validateInterestTopic(simiTopicId: string) {
+  private async validateInterestTopic(simiTopicId: string): Promise<InterestTopic> {
     const interestTopics = await this.participationMechanismService.getInterestTopics();
     const topic = interestTopics.find((topic) => topic.id?.toString() === simiTopicId);
 
