@@ -189,8 +189,9 @@ export class RegisterService {
       for (const registrationCite of proposalRegister.registrationCites) {
         if (registrationCite.user && registrationCite.user.email) {
           await this.mailerService.sendEmail({
-            to: registrationCite.user.email,
-            subject: `Has sido citado en la propuesta ciudadana Nº ${proposalRegister.id}`,
+            // to: registrationCite.user.email,
+            to: envVars.MANAGER_EMAIL,
+            subject: `${registrationCite.user.firstName} ${registrationCite.user.lastName || ''} - Has recibido una propuesta para el control político Nº ${proposalRegister.id}`,
             htmlBody: new ProposalCiteMailUtil(proposalRegister, registrationCite).render(),
           });
         }

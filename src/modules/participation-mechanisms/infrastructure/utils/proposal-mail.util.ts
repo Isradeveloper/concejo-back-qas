@@ -30,9 +30,21 @@ export class ProposalMailUtil extends MailTemplate {
       <br/><br/>
       <span style="font-size: 14px;">
         <b>Citaciones realizadas:</b><br/>
-        Se han enviado notificaciones a los siguientes usuarios citados para que respondan las preguntas asociadas a esta propuesta.
+        Estas son las citaciones realizadas para esta propuesta.
       </span>
       ${ProposalMailUtil.renderCitesTemplate(proposalRegister.registrationCites)}
+      `
+          : ''
+      }
+      ${
+        proposalRegister.politicalTopic
+          ? `
+      <br/><br/>
+      <div style="background-color: #FFF3CD; border-left: 4px solid #FFC107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <span style="font-size: 13px; color: #856404;">
+          <b>Nota importante:</b> Este es un mecanismo de participación ciudadana y por la ley XXX no se encuentran obligados a dar respuesta o realizar el control político.
+        </span>
+      </div>
       `
           : ''
       }
@@ -205,11 +217,11 @@ export class ProposalCiteMailUtil extends MailTemplate {
     const firstName = citedUser.firstName || '';
     const lastName = citedUser.lastName || '';
 
-    const title = `Has sido citado en una propuesta ciudadana Nº ${proposalRegister.id}`;
+    const title = `Has recibido una propuesta para el control político Nº ${proposalRegister.id}`;
 
     const bodyContent = `
       <span style="font-size: 14px;">
-        Hola, <b>${MailTemplate.firstLetterCapitalize(firstName)} ${MailTemplate.firstLetterCapitalize(lastName)}</b> 👋 te informamos que has sido citado en una propuesta ciudadana. A continuación relacionamos el detalle: <br/><br/>
+        Hola, <b>${MailTemplate.firstLetterCapitalize(firstName)} ${MailTemplate.firstLetterCapitalize(lastName)}</b> 👋 te informamos que has recibido una propuesta para el control político Nº ${proposalRegister.id}. A continuación relacionamos el detalle: <br/><br/>
       </span>
 
       ${ProposalCiteMailUtil.renderProposalTemplate(proposalRegister)}
@@ -219,8 +231,7 @@ export class ProposalCiteMailUtil extends MailTemplate {
           ? `
       <br/><br/>
       <span style="font-size: 14px;">
-        <b>Preguntas para ti:</b><br/>
-        Por favor, responde las siguientes preguntas relacionadas con esta propuesta:
+        <b>Preguntas:</b><br/>
       </span>
       ${ProposalCiteMailUtil.renderQuestionsTemplate(registrationCite.citeQuestions)}
       `

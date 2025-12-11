@@ -250,9 +250,7 @@ export class UserRepository {
           },
         },
       },
-      orderBy: {
-        firstName: 'asc',
-      },
+      orderBy: [{ dependency: { name: 'asc' } }, { firstName: 'asc' }],
     });
 
     return users.map((user) => ({

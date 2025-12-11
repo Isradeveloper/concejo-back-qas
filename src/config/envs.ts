@@ -27,6 +27,7 @@ const envSchema = joi
     APP_URL: joi.string().required(),
     ADMIN_EMAIL: joi.string().email().required(),
     ADMIN_PASSWORD: joi.string().required(),
+    MANAGER_EMAIL: joi.string().email().required(),
   })
   .unknown(true);
 
