@@ -13,6 +13,7 @@ interface EnvVars {
   APP_URL: string;
   ADMIN_EMAIL: string;
   ADMIN_PASSWORD: string;
+  MANAGER_EMAIL: string;
 }
 
 const envSchema = joi
