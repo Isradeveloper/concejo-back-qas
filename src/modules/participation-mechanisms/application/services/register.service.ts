@@ -179,7 +179,7 @@ export class RegisterService {
       if (creatorUser.email) {
         await this.mailerService.sendEmail({
           to: creatorUser.email,
-          subject: `Propuesta ciudadana Nº ${proposalRegister.id} creada exitosamente`,
+          subject: `Acuse de recibido - Propuesta ciudadana Nº ${proposalRegister.id} para el ejercicio del control político`,
           htmlBody: new ProposalMailUtil(proposalRegister).render(),
         });
       }

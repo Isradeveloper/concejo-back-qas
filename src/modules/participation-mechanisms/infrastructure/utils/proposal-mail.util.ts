@@ -15,12 +15,24 @@ export class ProposalMailUtil extends MailTemplate {
     const firstName = user.firstName || '';
     const lastName = user.lastName || '';
 
-    const title = '¡Propuesta ciudadana creada exitosamente!';
+    const title = `Acuse de recibido - Propuesta ciudadana Nº ${proposalRegister.id} para el ejercicio del control político`;
 
     const bodyContent = `
       <span style="font-size: 14px;">
-        Hola, <b>${MailTemplate.firstLetterCapitalize(firstName)} ${MailTemplate.firstLetterCapitalize(lastName)}</b> 👋 te confirmamos que tu propuesta ciudadana ha sido creada exitosamente. A continuación relacionamos el detalle: <br/><br/>
+        Estimado(a) ciudadano(a): <br/>
+        Reciba un cordial saludo del Concejo Distrital de Medellín. <br/><br/>
+        Por medio del presente, confirmamos la recepción de su propuesta ciudadana para el ejercicio del control político, presentada a través de nuestros canales de atención, en cumplimiento de lo establecido en el artículo 179 del Reglamento Interno del Concejo Distrital de Medellín y la Ley 1757 de 2015. <br/><br/>
+
+        <b>Información sobre el trámite de su propuesta:</b><br/>
+
+        Su propuesta será sometida a un proceso de revisión para verificar el cumplimiento de los requisitos establecidos en la normativa vigente. Una vez superada esta etapa de revisión, su comunicación será remitida a cada uno de los 21 concejalas y concejales del Concejo Distrital de Medellín para su conocimiento y consideración. <br/>
+        Este mecanismo de participación ciudadana constituye un importante canal para que sus ideas y aportes puedan enriquecer la labor de control político de la Corporación.<br/>
+        Es importante tener en cuenta que, de conformidad con la normativa vigente, la adopción de las propuestas ciudadanas por parte de las bancadas y concejales es potestativa, lo que significa que cada bancada decidirá de manera autónoma si incorpora o no las propuestas recibidas en sus proposiciones de control político, sin que exista obligación de adopción o respuesta.<br/>
+        Agradecemos su participación activa en los asuntos públicos de nuestra ciudad y su interés en contribuir al ejercicio del control político en el Concejo Distrital de Medellín.<br/>
+        Para cualquier consulta adicional, puede comunicarse con nosotros a través de nuestros canales oficiales de atención.<br/><br/>
       </span>
+
+      <h4 style="font-size: 16px; font-weight: bold; margin-top: 20px;">Detalles de la propuesta:</h4>
 
       ${ProposalMailUtil.renderProposalTemplate(proposalRegister)}
 
@@ -36,13 +48,20 @@ export class ProposalMailUtil extends MailTemplate {
       `
           : ''
       }
+
+      <span style="font-size: 14px;">
+        <br/><br/>Cordialmente,<br/><br/>
+        
+        <b>Concejo Distrital de Medellín</b><br/><br/>
+      </span
+
       ${
         proposalRegister.politicalTopic
           ? `
       <br/><br/>
       <div style="background-color: #FFF3CD; border-left: 4px solid #FFC107; padding: 15px; margin: 20px 0; border-radius: 4px;">
         <span style="font-size: 13px; color: #856404;">
-          <b>Nota importante:</b> Este es un mecanismo de participación ciudadana y por la ley XXX no se encuentran obligados a dar respuesta o realizar el control político.
+          <b>Nota importante:</b> &nbsp; Este es un mensaje automático. Por favor no responda a este correo.
         </span>
       </div>
       `
